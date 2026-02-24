@@ -15,10 +15,10 @@ const GEOCODE_API = "https://geocoding-api.open-meteo.com/v1/search";
 const MET_NO_FORECAST_API =
   "https://api.met.no/weatherapi/locationforecast/2.0/compact";
 const MET_NO_SUNRISE_API = "https://api.met.no/weatherapi/sunrise/3.0/sun";
-const APP_USER_AGENT =
-  "yr-no-raycast-extension/1.0 (https://github.com/your-org/yr.no-ray)";
 const MAX_FORECAST_DAYS = 10;
 const TEMPERATURE_UNIT_STORAGE_KEY = "temperature-unit";
+const SUGGESTED_USER_AGENT =
+  "yr-no-raycast-extension/1.0 (https://github.com/your-org/yr.no-ray)";
 
 type TemperatureUnit = "celsius" | "fahrenheit";
 
@@ -393,6 +393,37 @@ function buildTemperatureUnitActions(
   );
 }
 
+function buildInfoActions() {
+  return (
+    <ActionPanel.Section title="About">
+      <Action.OpenInBrowser
+        title="Yr.no API Docs"
+        url="https://api.met.no/weatherapi/locationforecast/2.0/documentation"
+      />
+      <Action.OpenInBrowser
+        title="Open-Meteo Geocoding Docs"
+        url="https://open-meteo.com/en/docs/geocoding-api"
+      />
+      <Action.CopyToClipboard
+        title="Copy Suggested User-Agent"
+        content={SUGGESTED_USER_AGENT}
+      />
+    </ActionPanel.Section>
+  );
+}
+
+function buildCommonActions(
+  temperatureUnit: TemperatureUnit,
+  setTemperatureUnit: (unit: TemperatureUnit) => void,
+) {
+  return (
+    <>
+      {buildTemperatureUnitActions(temperatureUnit, setTemperatureUnit)}
+      {buildInfoActions()}
+    </>
+  );
+}
+
 function buildDailyForecast(
   timeseries: ForecastEntry[],
   timezone: string,
@@ -665,7 +696,7 @@ function DayDetailsView(props: {
           ]}
           actions={
             <ActionPanel>
-              {buildTemperatureUnitActions(temperatureUnit, setTemperatureUnit)}
+              {buildCommonActions(temperatureUnit, setTemperatureUnit)}
             </ActionPanel>
           }
         />
@@ -679,7 +710,7 @@ function DayDetailsView(props: {
           icon={Icon.Info}
           actions={
             <ActionPanel>
-              {buildTemperatureUnitActions(temperatureUnit, setTemperatureUnit)}
+              {buildCommonActions(temperatureUnit, setTemperatureUnit)}
             </ActionPanel>
           }
         />
@@ -689,7 +720,7 @@ function DayDetailsView(props: {
           icon={Icon.Sun}
           actions={
             <ActionPanel>
-              {buildTemperatureUnitActions(temperatureUnit, setTemperatureUnit)}
+              {buildCommonActions(temperatureUnit, setTemperatureUnit)}
             </ActionPanel>
           }
         />
@@ -703,7 +734,7 @@ function DayDetailsView(props: {
           icon={Icon.Wind}
           actions={
             <ActionPanel>
-              {buildTemperatureUnitActions(temperatureUnit, setTemperatureUnit)}
+              {buildCommonActions(temperatureUnit, setTemperatureUnit)}
             </ActionPanel>
           }
         />
@@ -717,7 +748,7 @@ function DayDetailsView(props: {
           icon={Icon.Droplets}
           actions={
             <ActionPanel>
-              {buildTemperatureUnitActions(temperatureUnit, setTemperatureUnit)}
+              {buildCommonActions(temperatureUnit, setTemperatureUnit)}
             </ActionPanel>
           }
         />
@@ -756,10 +787,7 @@ function DayDetailsView(props: {
             ]}
             actions={
               <ActionPanel>
-                {buildTemperatureUnitActions(
-                  temperatureUnit,
-                  setTemperatureUnit,
-                )}
+                {buildCommonActions(temperatureUnit, setTemperatureUnit)}
               </ActionPanel>
             }
           />
@@ -864,10 +892,7 @@ function ForecastView(props: {
                       title="Open Raw API Response"
                       url={`${MET_NO_FORECAST_API}?lat=${location.latitude.toFixed(4)}&lon=${location.longitude.toFixed(4)}`}
                     />
-                    {buildTemperatureUnitActions(
-                      temperatureUnit,
-                      setTemperatureUnit,
-                    )}
+                    {buildCommonActions(temperatureUnit, setTemperatureUnit)}
                   </ActionPanel>
                 }
               />
@@ -882,7 +907,7 @@ function ForecastView(props: {
 export default function Command() {
   const { temperatureUnit, setTemperatureUnit } = useTemperatureUnit();
   const [searchText, setSearchText] = useState("");
-  const [hasSeededSearch, setHasSeededSearch] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
   const query = searchText.trim();
   const { data: places = [], isLoading, error } = usePlaceSearch(query);
 
@@ -892,34 +917,17 @@ export default function Command() {
     }
   }, [error]);
 
-  useEffect(() => {
-    if (hasSeededSearch) {
-      return;
-    }
-
-    setHasSeededSearch(true);
-
-    void (async () => {
-      const saved = await LocalStorage.getItem<string>("last-place");
-      if (saved?.trim()) {
-        setSearchText(saved);
-      }
-    })();
-  }, [hasSeededSearch]);
-
-  useEffect(() => {
-    if (query.length >= 2) {
-      void LocalStorage.setItem("last-place", query);
-    }
-  }, [query]);
-
   const shouldShowHint = query.length === 0;
-  const needsMoreCharacters = query.length > 0 && query.length < 2;
+  const needsMoreCharacters =
+    hasInteracted && query.length > 0 && query.length < 2;
 
   return (
     <List
       isLoading={isLoading}
-      onSearchTextChange={setSearchText}
+      onSearchTextChange={(text) => {
+        setHasInteracted(true);
+        setSearchText(text);
+      }}
       searchText={searchText}
       searchBarPlaceholder="Type a place (e.g. Oslo, Berlin, New York)"
     >
@@ -935,10 +943,7 @@ export default function Command() {
             }
             actions={
               <ActionPanel>
-                {buildTemperatureUnitActions(
-                  temperatureUnit,
-                  setTemperatureUnit,
-                )}
+                {buildCommonActions(temperatureUnit, setTemperatureUnit)}
               </ActionPanel>
             }
           />
@@ -946,6 +951,7 @@ export default function Command() {
       ) : null}
       {!shouldShowHint &&
       !needsMoreCharacters &&
+      hasInteracted &&
       places.length === 0 &&
       !isLoading ? (
         <List.Section title="Search">
@@ -955,10 +961,7 @@ export default function Command() {
             subtitle="Try city + country, for example: Paris France"
             actions={
               <ActionPanel>
-                {buildTemperatureUnitActions(
-                  temperatureUnit,
-                  setTemperatureUnit,
-                )}
+                {buildCommonActions(temperatureUnit, setTemperatureUnit)}
               </ActionPanel>
             }
           />
@@ -994,55 +997,13 @@ export default function Command() {
                     title="Copy Coordinates"
                     content={`${place.latitude.toFixed(5)}, ${place.longitude.toFixed(5)}`}
                   />
-                  {buildTemperatureUnitActions(
-                    temperatureUnit,
-                    setTemperatureUnit,
-                  )}
+                  {buildCommonActions(temperatureUnit, setTemperatureUnit)}
                 </ActionPanel>
               }
             />
           ))}
         </List.Section>
       ) : null}
-      <List.Item
-        key="about-api"
-        icon={{ source: Icon.Info, tintColor: Color.SecondaryText }}
-        title="Data source"
-        subtitle="Forecast: yr.no (met.no) / Geocoding: Open-Meteo"
-        actions={
-          <ActionPanel>
-            <Action.OpenInBrowser
-              title="Yr.no API Docs"
-              url="https://api.met.no/weatherapi/locationforecast/2.0/documentation"
-            />
-            <Action.OpenInBrowser
-              title="Open-Meteo Geocoding Docs"
-              url="https://open-meteo.com/en/docs/geocoding-api"
-            />
-            {buildTemperatureUnitActions(temperatureUnit, setTemperatureUnit)}
-          </ActionPanel>
-        }
-      />
-      <List.Item
-        key="api-user-agent"
-        icon={{ source: Icon.Person, tintColor: Color.SecondaryText }}
-        title="Set your own User-Agent"
-        subtitle="met.no asks for a unique app identifier and contact details."
-        actions={
-          <ActionPanel>
-            <Action
-              title="Show Current User-Agent"
-              onAction={() =>
-                void showToast({
-                  style: Toast.Style.Success,
-                  title: APP_USER_AGENT,
-                })
-              }
-            />
-            {buildTemperatureUnitActions(temperatureUnit, setTemperatureUnit)}
-          </ActionPanel>
-        }
-      />
     </List>
   );
 }

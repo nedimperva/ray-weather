@@ -1,0 +1,43 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "yr-no-weather",
+  "title": "YR.NO Weather",
+  "description": "Quickly check yr.no weather for today and upcoming days by place name.",
+  "icon": "icon.png",
+  "author": "you",
+  "categories": [
+    "Productivity",
+    "Other"
+  ],
+  "license": "MIT",
+  "version": "1.0.0",
+  "platforms": [
+    "Windows"
+  ],
+  "commands": [
+    {
+      "name": "search-weather",
+      "title": "Search Weather",
+      "description": "Check yr.no forecast for today and next days",
+      "mode": "view"
+    }
+  ],
+  "scripts": {
+    "build": "ray build -e dist",
+    "dev": "ray develop",
+    "lint": "ray lint",
+    "fix-lint": "ray lint --fix"
+  },
+  "dependencies": {
+    "@raycast/api": "^1.104.6",
+    "@raycast/utils": "^2.2.2"
+  },
+  "devDependencies": {
+    "@raycast/eslint-config": "^2.1.1",
+    "@types/node": "22.13.10",
+    "@types/react": "19.0.10",
+    "eslint": "^9.21.0",
+    "prettier": "^3.5.2",
+    "typescript": "^5.9.3"
+  }
+}

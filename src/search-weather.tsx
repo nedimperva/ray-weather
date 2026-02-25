@@ -9,132 +9,34 @@ import {
   Toast,
 } from "@raycast/api";
 import { showFailureToast, useFetch } from "@raycast/utils";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import type {
+  TemperatureUnit,
+  Location,
+  GeocodeApiResponse,
+  MetNoForecastResponse,
+  MetNoSunResponse,
+  DailyForecast,
+  HourlyForecast,
+  WeatherAlert,
+} from "./types";
 
 const GEOCODE_API = "https://geocoding-api.open-meteo.com/v1/search";
 const MET_NO_FORECAST_API =
   "https://api.met.no/weatherapi/locationforecast/2.0/compact";
 const MET_NO_SUNRISE_API = "https://api.met.no/weatherapi/sunrise/3.0/sun";
+const MET_NO_ALERTS_API =
+  "https://api.met.no/weatherapi/metalerts/2.0/current.json";
+const AIR_QUALITY_API = "https://air-quality-api.open-meteo.com/v1/air-quality";
 const MAX_FORECAST_DAYS = 10;
 const TEMPERATURE_UNIT_STORAGE_KEY = "temperature-unit";
-const SUGGESTED_USER_AGENT =
+const FAVORITE_LOCATIONS_KEY = "favorite-locations";
+const SEARCH_HISTORY_KEY = "search-history";
+const MAX_HISTORY_ITEMS = 10;
+const MAX_FAVORITES = 20;
+
+const APP_USER_AGENT =
   "yr-no-raycast-extension/1.0 (https://github.com/your-org/yr.no-ray)";
-
-type TemperatureUnit = "celsius" | "fahrenheit";
-
-type GeocodeApiResult = {
-  name: string;
-  latitude: number;
-  longitude: number;
-  country?: string;
-  admin1?: string;
-  timezone?: string;
-};
-
-type GeocodeApiResponse = {
-  results?: GeocodeApiResult[];
-};
-
-type Location = {
-  id: string;
-  name: string;
-  latitude: number;
-  longitude: number;
-  country?: string;
-  region?: string;
-  timezone: string;
-};
-
-type ForecastEntry = {
-  time: string;
-  data: {
-    instant: {
-      details: {
-        air_temperature: number;
-        wind_speed?: number;
-        relative_humidity?: number;
-        air_pressure_at_sea_level?: number;
-      };
-    };
-    next_1_hours?: {
-      summary?: {
-        symbol_code?: string;
-      };
-      details?: {
-        precipitation_amount?: number;
-      };
-    };
-  };
-};
-
-type MetNoForecastResponse = {
-  properties?: {
-    timeseries?: ForecastEntry[];
-  };
-};
-
-type MetNoSunResponse = {
-  properties?: {
-    sunrise?: {
-      time?: string;
-    };
-    sunset?: {
-      time?: string;
-    };
-  };
-};
-
-type DailyForecast = {
-  dateKey: string;
-  label: string;
-  shortDate: string;
-  dayAndDate: string;
-  minTempC: number;
-  maxTempC: number;
-  minFeelsLikeC: number;
-  maxFeelsLikeC: number;
-  minTempF: number;
-  maxTempF: number;
-  precipitationMm: number;
-  symbolCode: string;
-  condition: string;
-  avgWindSpeedMs?: number;
-  avgHumidityPct?: number;
-  hourly: HourlyForecast[];
-};
-
-type HourlyForecast = {
-  id: string;
-  localTimeLabel: string;
-  hour: number;
-  temperatureC: number;
-  precipitationMm: number;
-  windSpeedMs?: number;
-  humidityPct?: number;
-  pressureHpa?: number;
-  feelsLikeC: number;
-  symbolCode: string;
-  condition: string;
-};
-
-type SymbolCandidate = {
-  symbol: string;
-  hour: number;
-};
-
-type DailyAccumulator = {
-  minTempC: number;
-  maxTempC: number;
-  minFeelsLikeC: number;
-  maxFeelsLikeC: number;
-  precipitationMm: number;
-  symbolCandidates: SymbolCandidate[];
-  windSpeedTotal: number;
-  windSpeedCount: number;
-  humidityTotal: number;
-  humidityCount: number;
-  hourly: HourlyForecast[];
-};
 
 function normalizeLocationId(
   location: Pick<Location, "name" | "latitude" | "longitude">,
@@ -203,10 +105,10 @@ function calculateFeelsLikeC(
 
 function formatTemperature(tempC: number, unit: TemperatureUnit): string {
   if (unit === "fahrenheit") {
-    return `${Math.round(toFahrenheit(tempC))} F`;
+    return `${Math.round(toFahrenheit(tempC))}°F`;
   }
 
-  return `${Math.round(tempC)} C`;
+  return `${Math.round(tempC)}°C`;
 }
 
 function formatTemperatureRange(
@@ -246,19 +148,54 @@ function iconForSymbol(symbolCode: string): Icon {
     return Icon.CloudRain;
   }
 
-  if (symbolCode.includes("fog")) {
-    return Icon.EyeDisabled;
+  if (symbolCode.includes("drizzle")) {
+    return Icon.CloudRain;
   }
 
-  if (symbolCode.includes("partlycloudy") || symbolCode.includes("fair")) {
+  if (symbolCode.includes("fog") || symbolCode.includes("mist")) {
+    return Icon.Cloud;
+  }
+
+  if (symbolCode.includes("partlycloudy")) {
     return Icon.CloudSun;
+  }
+
+  if (symbolCode.includes("fair")) {
+    return Icon.Sun;
   }
 
   if (symbolCode.includes("clearsky")) {
     return Icon.Sun;
   }
 
+  if (symbolCode.includes("overcast")) {
+    return Icon.Cloud;
+  }
+
   return Icon.Cloud;
+}
+
+function iconForAqi(aqi: number): Icon {
+  if (aqi >= 4) {
+    return Icon.Warning;
+  }
+  if (aqi >= 2) {
+    return Icon.ExclamationMark;
+  }
+  return Icon.CheckCircle;
+}
+
+function aqiLabel(aqi: number): string {
+  if (aqi >= 4) {
+    return "Unhealthy";
+  }
+  if (aqi >= 3) {
+    return "Unhealthy for Sensitive";
+  }
+  if (aqi >= 2) {
+    return "Moderate";
+  }
+  return "Good";
 }
 
 function conditionLabelForSymbol(symbolCode: string): string {
@@ -324,6 +261,33 @@ function normalizeTemperatureUnit(
   return value === "fahrenheit" ? "fahrenheit" : "celsius";
 }
 
+function useLocalStorage<T>(key: string, defaultValue: T) {
+  const [value, setValue] = useState<T>(defaultValue);
+
+  useEffect(() => {
+    void (async () => {
+      const saved = await LocalStorage.getItem<string>(key);
+      if (saved) {
+        try {
+          setValue(JSON.parse(saved));
+        } catch {
+          setValue(defaultValue);
+        }
+      }
+    })();
+  }, [key, defaultValue]);
+
+  const updateValue = useCallback(
+    (newValue: T) => {
+      setValue(newValue);
+      void LocalStorage.setItem(key, JSON.stringify(newValue));
+    },
+    [key],
+  );
+
+  return [value, updateValue] as const;
+}
+
 function useTemperatureUnit() {
   const [temperatureUnit, setTemperatureUnitState] =
     useState<TemperatureUnit>("celsius");
@@ -347,6 +311,73 @@ function useTemperatureUnit() {
   };
 
   return { temperatureUnit, setTemperatureUnit };
+}
+
+function useFavoriteLocations() {
+  const [favorites, setFavorites] = useLocalStorage<Location[]>(
+    FAVORITE_LOCATIONS_KEY,
+    [],
+  );
+
+  const addFavorite = useCallback(
+    (location: Location) => {
+      if (!favorites.find((f) => f.id === location.id)) {
+        const newFavorites = [...favorites, location].slice(0, MAX_FAVORITES);
+        setFavorites(newFavorites);
+        void showToast({
+          style: Toast.Style.Success,
+          title: `Added ${location.name} to favorites`,
+        });
+      }
+    },
+    [favorites, setFavorites],
+  );
+
+  const removeFavorite = useCallback(
+    (locationId: string) => {
+      setFavorites(favorites.filter((f) => f.id !== locationId));
+      void showToast({
+        style: Toast.Style.Success,
+        title: "Removed from favorites",
+      });
+    },
+    [favorites, setFavorites],
+  );
+
+  const isFavorite = useCallback(
+    (locationId: string) => {
+      return favorites.some((f) => f.id === locationId);
+    },
+    [favorites],
+  );
+
+  return { favorites, addFavorite, removeFavorite, isFavorite };
+}
+
+function useSearchHistory() {
+  const [history, setHistory] = useLocalStorage<Location[]>(
+    SEARCH_HISTORY_KEY,
+    [],
+  );
+
+  const addToHistory = useCallback(
+    (location: Location) => {
+      const filtered = history.filter((h) => h.id !== location.id);
+      const newHistory = [location, ...filtered].slice(0, MAX_HISTORY_ITEMS);
+      setHistory(newHistory);
+    },
+    [history, setHistory],
+  );
+
+  const clearHistory = useCallback(() => {
+    setHistory([]);
+    void showToast({
+      style: Toast.Style.Success,
+      title: "Search history cleared",
+    });
+  }, [setHistory]);
+
+  return { history, addToHistory, clearHistory };
 }
 
 function TemperatureUnitActions(props: {
@@ -404,10 +435,6 @@ function buildInfoActions() {
         title="Open-Meteo Geocoding Docs"
         url="https://open-meteo.com/en/docs/geocoding-api"
       />
-      <Action.CopyToClipboard
-        title="Copy Suggested User-Agent"
-        content={SUGGESTED_USER_AGENT}
-      />
     </ActionPanel.Section>
   );
 }
@@ -425,11 +452,37 @@ function buildCommonActions(
 }
 
 function buildDailyForecast(
-  timeseries: ForecastEntry[],
+  timeseries: Array<{ time: string; data: unknown }>,
   timezone: string,
 ): DailyForecast[] {
   const safeTimeZone = ensureValidTimeZone(timezone);
-  const groupedByDay = new Map<string, DailyAccumulator>();
+  const groupedByDay = new Map<
+    string,
+    {
+      minTempC: number;
+      maxTempC: number;
+      minFeelsLikeC: number;
+      maxFeelsLikeC: number;
+      precipitationMm: number;
+      symbolCandidates: Array<{
+        symbol: string;
+        hour: number;
+        uvIndex?: number;
+      }>;
+      windSpeedTotal: number;
+      windSpeedCount: number;
+      humidityTotal: number;
+      humidityCount: number;
+      pressureTotal: number;
+      pressureCount: number;
+      visibilityTotal: number;
+      visibilityCount: number;
+      uvIndexTotal: number;
+      uvIndexCount: number;
+      hourly: HourlyForecast[];
+      pressures: number[];
+    }
+  >();
   const timeLabelFormatter = new Intl.DateTimeFormat("en-US", {
     timeZone: safeTimeZone,
     hour: "numeric",
@@ -437,12 +490,21 @@ function buildDailyForecast(
   });
 
   for (const entry of timeseries) {
+    const data = entry.data as {
+      instant?: {
+        details?: Record<string, unknown>;
+      };
+      next_1_hours?: {
+        summary?: { symbol_code?: string };
+        details?: { precipitation_amount?: number };
+      };
+    };
     const date = new Date(entry.time);
     if (Number.isNaN(date.getTime())) {
       continue;
     }
 
-    const tempC = entry.data?.instant?.details?.air_temperature;
+    const tempC = data?.instant?.details?.air_temperature as number | undefined;
     if (typeof tempC !== "number") {
       continue;
     }
@@ -450,11 +512,19 @@ function buildDailyForecast(
     const dayKey = dateKeyInTimezone(date, safeTimeZone);
     const hour = localHourInTimezone(date, safeTimeZone);
     const precipitation =
-      entry.data.next_1_hours?.details?.precipitation_amount ?? 0;
-    const symbol = entry.data.next_1_hours?.summary?.symbol_code ?? "cloudy";
-    const windSpeed = entry.data.instant.details.wind_speed;
-    const humidity = entry.data.instant.details.relative_humidity;
-    const pressure = entry.data.instant.details.air_pressure_at_sea_level;
+      (data.next_1_hours?.details?.precipitation_amount as number) ?? 0;
+    const symbol =
+      (data.next_1_hours?.summary?.symbol_code as string) ?? "cloudy";
+    const windSpeed = data.instant?.details?.wind_speed as number | undefined;
+    const humidity = data.instant?.details?.relative_humidity as
+      | number
+      | undefined;
+    const pressure = data.instant?.details?.air_pressure_at_sea_level as
+      | number
+      | undefined;
+    const visibility = data.instant?.details?.fog_area_fraction as
+      | number
+      | undefined;
     const feelsLikeC = calculateFeelsLikeC(tempC, windSpeed, humidity);
 
     if (!groupedByDay.has(dayKey)) {
@@ -469,7 +539,14 @@ function buildDailyForecast(
         windSpeedCount: 0,
         humidityTotal: 0,
         humidityCount: 0,
+        pressureTotal: 0,
+        pressureCount: 0,
+        visibilityTotal: 0,
+        visibilityCount: 0,
+        uvIndexTotal: 0,
+        uvIndexCount: 0,
         hourly: [],
+        pressures: [],
       });
     }
 
@@ -487,6 +564,15 @@ function buildDailyForecast(
       current.humidityTotal += humidity;
       current.humidityCount += 1;
     }
+    if (typeof pressure === "number") {
+      current.pressureTotal += pressure;
+      current.pressureCount += 1;
+      current.pressures.push(pressure);
+    }
+    if (typeof visibility === "number") {
+      current.visibilityTotal += visibility;
+      current.visibilityCount += 1;
+    }
 
     current.symbolCandidates.push({ symbol, hour });
     current.hourly.push({
@@ -501,6 +587,8 @@ function buildDailyForecast(
       feelsLikeC,
       symbolCode: symbol,
       condition: conditionLabelForSymbol(symbol),
+      visibilityKm:
+        visibility !== undefined ? (1 - visibility) * 10 : undefined,
     });
   }
 
@@ -538,6 +626,34 @@ function buildDailyForecast(
       current.humidityCount > 0
         ? current.humidityTotal / current.humidityCount
         : undefined;
+    const avgPressureHpa =
+      current.pressureCount > 0
+        ? current.pressureTotal / current.pressureCount
+        : undefined;
+    const avgVisibilityKm =
+      current.visibilityCount > 0
+        ? (1 - current.visibilityTotal / current.visibilityCount) * 10
+        : undefined;
+
+    let pressureTrend: "rising" | "falling" | "stable" = "stable";
+    if (current.pressures.length >= 3) {
+      const firstHalf = current.pressures.slice(
+        0,
+        Math.floor(current.pressures.length / 2),
+      );
+      const secondHalf = current.pressures.slice(
+        Math.floor(current.pressures.length / 2),
+      );
+      const avgFirst = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length;
+      const avgSecond =
+        secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
+      const diff = avgSecond - avgFirst;
+      if (diff > 1) {
+        pressureTrend = "rising";
+      } else if (diff < -1) {
+        pressureTrend = "falling";
+      }
+    }
 
     return {
       dateKey: dayKey,
@@ -555,6 +671,9 @@ function buildDailyForecast(
       condition,
       avgWindSpeedMs,
       avgHumidityPct,
+      avgPressureHpa,
+      pressureTrend,
+      avgVisibilityKm,
       hourly: current.hourly.sort((a, b) => a.hour - b.hour),
     };
   });
@@ -608,34 +727,68 @@ function usePlaceSearch(searchText: string) {
   });
 }
 
+interface FetchOptions {
+  headers?: Record<string, string>;
+}
+
+function useCachedFetch<T>(url: string, options?: FetchOptions) {
+  return useFetch<T>(url, {
+    keepPreviousData: true,
+    headers: {
+      "User-Agent": APP_USER_AGENT,
+      ...options?.headers,
+    },
+    parseResponse: async (response) => {
+      if (!response.ok) {
+        throw new Error(`Request failed (${response.status})`);
+      }
+      return response.json() as Promise<T>;
+    },
+  });
+}
+
 function useForecast(location: Location) {
   const url = `${MET_NO_FORECAST_API}?lat=${location.latitude.toFixed(4)}&lon=${location.longitude.toFixed(4)}`;
 
-  return useFetch(url, {
-    keepPreviousData: true,
-    parseResponse: async (response) => {
-      if (!response.ok) {
-        throw new Error(`Forecast request failed (${response.status})`);
-      }
-
-      return (await response.json()) as MetNoForecastResponse;
-    },
-  });
+  return useCachedFetch<MetNoForecastResponse>(url);
 }
 
 function useSunEvents(location: Location, dateKey: string) {
   const url = `${MET_NO_SUNRISE_API}?lat=${location.latitude.toFixed(4)}&lon=${location.longitude.toFixed(4)}&date=${dateKey}`;
 
-  return useFetch(url, {
-    keepPreviousData: true,
-    parseResponse: async (response) => {
-      if (!response.ok) {
-        throw new Error(`Sun events request failed (${response.status})`);
-      }
+  return useCachedFetch<MetNoSunResponse>(url);
+}
 
-      return (await response.json()) as MetNoSunResponse;
-    },
-  });
+function useAirQuality(location: Location) {
+  const url = `${AIR_QUALITY_API}?latitude=${location.latitude}&longitude=${location.longitude}&hourly=us_aqi,pm10,pm2_5,ozone,nitrogen_dioxide,carbon_monoxide&forecast_days=1&timeformat=unixtime`;
+
+  return useCachedFetch<{
+    hourly?: {
+      time?: number[];
+      us_aqi?: number[];
+      pm10?: number[];
+      pm2_5?: number[];
+      ozone?: number[];
+      nitrogen_dioxide?: number[];
+      carbon_monoxide?: number[];
+    };
+  }>(url);
+}
+
+function useWeatherAlerts(location: Location) {
+  const url = `${MET_NO_ALERTS_API}?lat=${location.latitude}&lon=${location.longitude}`;
+
+  return useCachedFetch<{
+    features?: Array<{
+      properties?: {
+        event?: string;
+        headline?: string;
+        description?: string;
+        severity?: string;
+        area?: string;
+      };
+    }>;
+  }>(url);
 }
 
 function locationSummary(location: Location): string {
@@ -643,13 +796,148 @@ function locationSummary(location: Location): string {
   return subtitle ? `${location.name}, ${subtitle}` : location.name;
 }
 
+function AlertBadge(props: { alerts: WeatherAlert[] }) {
+  if (props.alerts.length === 0) return null;
+
+  const severityColors: Record<string, Color> = {
+    extreme: Color.Red,
+    severe: Color.Orange,
+    moderate: Color.Yellow,
+    minor: Color.Green,
+  };
+
+  return (
+    <List.Section title="Weather Alerts">
+      {props.alerts.map((alert, index) => (
+        <List.Item
+          key={index}
+          title={alert.event}
+          subtitle={alert.headline}
+          icon={{
+            source: Icon.Warning,
+            tintColor: severityColors[alert.severity] ?? Color.Yellow,
+          }}
+        />
+      ))}
+    </List.Section>
+  );
+}
+
+function AirQualityView(props: {
+  location: Location;
+  temperatureUnit: TemperatureUnit;
+  setTemperatureUnit: (unit: TemperatureUnit) => void;
+}) {
+  const { location, temperatureUnit, setTemperatureUnit } = props;
+  const { data, error, isLoading } = useAirQuality(location);
+
+  useEffect(() => {
+    if (error) {
+      void showFailureToast(error, { title: "Failed to load air quality" });
+    }
+  }, [error]);
+
+  const hourly = data?.hourly;
+  const getCurrentValue = <T,>(arr: T[] | undefined): T | undefined => {
+    if (!arr || arr.length === 0) return undefined;
+    return arr.find((v) => v !== undefined) ?? arr[0];
+  };
+
+  const aqi = getCurrentValue(hourly?.us_aqi);
+  const pm25 = getCurrentValue(hourly?.pm2_5);
+  const pm10 = getCurrentValue(hourly?.pm10);
+  const o3 = getCurrentValue(hourly?.ozone);
+  const no2 = getCurrentValue(hourly?.nitrogen_dioxide);
+  const co = getCurrentValue(hourly?.carbon_monoxide);
+
+  return (
+    <List
+      isLoading={isLoading}
+      searchBarPlaceholder={`Air Quality for ${location.name}`}
+    >
+      <List.Section title="Air Quality Index">
+        <List.Item
+          title="AQI"
+          subtitle={aqi !== undefined ? `${aqi} - ${aqiLabel(aqi)}` : "No data"}
+          icon={{
+            source: iconForAqi(aqi ?? 0),
+            tintColor:
+              aqi && aqi >= 4
+                ? Color.Red
+                : aqi && aqi >= 2
+                  ? Color.Yellow
+                  : Color.Green,
+          }}
+          accessories={aqi !== undefined ? [{ text: aqi.toString() }] : []}
+          actions={
+            <ActionPanel>
+              {buildCommonActions(temperatureUnit, setTemperatureUnit)}
+            </ActionPanel>
+          }
+        />
+        <List.Item
+          title="PM2.5"
+          subtitle={pm25 !== undefined ? `${pm25.toFixed(1)} µg/m³` : "No data"}
+          icon={Icon.Droplets}
+          actions={
+            <ActionPanel>
+              {buildCommonActions(temperatureUnit, setTemperatureUnit)}
+            </ActionPanel>
+          }
+        />
+        <List.Item
+          title="PM10"
+          subtitle={pm10 !== undefined ? `${pm10.toFixed(1)} µg/m³` : "No data"}
+          icon={Icon.Droplets}
+          actions={
+            <ActionPanel>
+              {buildCommonActions(temperatureUnit, setTemperatureUnit)}
+            </ActionPanel>
+          }
+        />
+        <List.Item
+          title="Ozone"
+          subtitle={o3 !== undefined ? `${o3.toFixed(1)} µg/m³` : "No data"}
+          icon={Icon.Sun}
+          actions={
+            <ActionPanel>
+              {buildCommonActions(temperatureUnit, setTemperatureUnit)}
+            </ActionPanel>
+          }
+        />
+        <List.Item
+          title="NO₂"
+          subtitle={no2 !== undefined ? `${no2.toFixed(1)} µg/m³` : "No data"}
+          icon={Icon.Wind}
+          actions={
+            <ActionPanel>
+              {buildCommonActions(temperatureUnit, setTemperatureUnit)}
+            </ActionPanel>
+          }
+        />
+        <List.Item
+          title="CO"
+          subtitle={co !== undefined ? `${co.toFixed(1)} µg/m³` : "No data"}
+          icon={Icon.Wind}
+          actions={
+            <ActionPanel>
+              {buildCommonActions(temperatureUnit, setTemperatureUnit)}
+            </ActionPanel>
+          }
+        />
+      </List.Section>
+    </List>
+  );
+}
+
 function DayDetailsView(props: {
   location: Location;
   day: DailyForecast;
   temperatureUnit: TemperatureUnit;
   setTemperatureUnit: (unit: TemperatureUnit) => void;
+  alerts: WeatherAlert[];
 }) {
-  const { location, day, temperatureUnit, setTemperatureUnit } = props;
+  const { location, day, temperatureUnit, setTemperatureUnit, alerts } = props;
   const {
     data: sunData,
     error: sunError,
@@ -671,11 +959,19 @@ function DayDetailsView(props: {
     location.timezone,
   );
 
+  const pressureTrendIcon =
+    day.pressureTrend === "rising"
+      ? "↑"
+      : day.pressureTrend === "falling"
+        ? "↓"
+        : "→";
+
   return (
     <List
       isLoading={isSunLoading}
       searchBarPlaceholder={`${day.label} details`}
     >
+      {alerts.length > 0 && <AlertBadge alerts={alerts} />}
       <List.Section title={`${locationSummary(location)} - ${day.dayAndDate}`}>
         <List.Item
           title="Summary"
@@ -752,6 +1048,34 @@ function DayDetailsView(props: {
             </ActionPanel>
           }
         />
+        <List.Item
+          title="Pressure"
+          subtitle={
+            day.avgPressureHpa !== undefined
+              ? `${day.avgPressureHpa.toFixed(0)} hPa ${pressureTrendIcon}`
+              : "No data"
+          }
+          icon={Icon.Gauge}
+          actions={
+            <ActionPanel>
+              {buildCommonActions(temperatureUnit, setTemperatureUnit)}
+            </ActionPanel>
+          }
+        />
+        <List.Item
+          title="Visibility"
+          subtitle={
+            day.avgVisibilityKm !== undefined
+              ? `${day.avgVisibilityKm.toFixed(1)} km`
+              : "No data"
+          }
+          icon={Icon.Eye}
+          actions={
+            <ActionPanel>
+              {buildCommonActions(temperatureUnit, setTemperatureUnit)}
+            </ActionPanel>
+          }
+        />
       </List.Section>
       <List.Section title="Hourly Forecast">
         {day.hourly.map((hour) => (
@@ -801,8 +1125,20 @@ function ForecastView(props: {
   location: Location;
   temperatureUnit: TemperatureUnit;
   setTemperatureUnit: (unit: TemperatureUnit) => void;
+  addFavorite: ReturnType<typeof useFavoriteLocations>["addFavorite"];
+  removeFavorite: ReturnType<typeof useFavoriteLocations>["removeFavorite"];
+  isFavorite: ReturnType<typeof useFavoriteLocations>["isFavorite"];
+  addToHistory: ReturnType<typeof useSearchHistory>["addToHistory"];
 }) {
-  const { location, temperatureUnit, setTemperatureUnit } = props;
+  const {
+    location,
+    temperatureUnit,
+    setTemperatureUnit,
+    addFavorite,
+    removeFavorite,
+    isFavorite,
+    addToHistory,
+  } = props;
   const { data, error, isLoading, revalidate } = useForecast(location);
 
   useEffect(() => {
@@ -811,20 +1147,86 @@ function ForecastView(props: {
     }
   }, [error]);
 
+  useEffect(() => {
+    addToHistory(location);
+  }, [location.id, addToHistory]);
+
+  const { data: alertsData } = useWeatherAlerts(location);
+
+  const alerts: WeatherAlert[] = useMemo(() => {
+    const result: WeatherAlert[] = [];
+    const features = alertsData?.features ?? [];
+    for (const feature of features) {
+      const props = feature.properties;
+      if (props?.event) {
+        result.push({
+          area: props.area ?? "",
+          event: props.event,
+          headline: props.headline ?? "",
+          description: props.description ?? "",
+          severity:
+            (props.severity?.toLowerCase() as WeatherAlert["severity"]) ??
+            "unknown",
+        });
+      }
+    }
+    return result;
+  }, [alertsData]);
+
   const dailyForecast = useMemo(() => {
     try {
       const timeseries = data?.properties?.timeseries ?? [];
-      return buildDailyForecast(timeseries, location.timezone);
+      return buildDailyForecast(
+        timeseries as Array<{ time: string; data: unknown }>,
+        location.timezone,
+      );
     } catch {
       return [];
     }
   }, [data, location.timezone]);
+
+  const favoriteAction = isFavorite(location.id) ? (
+    <Action
+      title="Remove from Favorites"
+      icon={Icon.StarDisabled}
+      onAction={() => removeFavorite(location.id)}
+    />
+  ) : (
+    <Action
+      title="Add to Favorites"
+      icon={Icon.Star}
+      onAction={() => addFavorite(location)}
+    />
+  );
 
   return (
     <List
       isLoading={isLoading}
       searchBarPlaceholder={`Forecast for ${location.name}`}
     >
+      {alerts.length > 0 && <AlertBadge alerts={alerts} />}
+      <List.Section title="Quick Actions">
+        <List.Item
+          title="View Air Quality"
+          icon={Icon.Wind}
+          actions={
+            <ActionPanel>
+              <Action.Push
+                title="Air Quality"
+                target={
+                  <AirQualityView
+                    location={location}
+                    temperatureUnit={temperatureUnit}
+                    setTemperatureUnit={setTemperatureUnit}
+                  />
+                }
+              />
+              {favoriteAction}
+              {buildCommonActions(temperatureUnit, setTemperatureUnit)}
+            </ActionPanel>
+          }
+        />
+      </List.Section>
       {dailyForecast.length === 0 ? (
         <List.EmptyView
           title="No forecast yet"
@@ -876,6 +1278,7 @@ function ForecastView(props: {
                           day={day}
                           temperatureUnit={temperatureUnit}
                           setTemperatureUnit={setTemperatureUnit}
+                          alerts={alerts}
                         />
                       }
                     />
@@ -888,10 +1291,7 @@ function ForecastView(props: {
                       icon={Icon.ArrowClockwise}
                       onAction={revalidate}
                     />
-                    <Action.OpenInBrowser
-                      title="Open Raw API Response"
-                      url={`${MET_NO_FORECAST_API}?lat=${location.latitude.toFixed(4)}&lon=${location.longitude.toFixed(4)}`}
-                    />
+                    {favoriteAction}
                     {buildCommonActions(temperatureUnit, setTemperatureUnit)}
                   </ActionPanel>
                 }
@@ -906,6 +1306,9 @@ function ForecastView(props: {
 
 export default function Command() {
   const { temperatureUnit, setTemperatureUnit } = useTemperatureUnit();
+  const { favorites, addFavorite, removeFavorite, isFavorite } =
+    useFavoriteLocations();
+  const { history, addToHistory, clearHistory } = useSearchHistory();
   const [searchText, setSearchText] = useState("");
   const [hasInteracted, setHasInteracted] = useState(false);
   const query = searchText.trim();
@@ -920,6 +1323,62 @@ export default function Command() {
   const shouldShowHint = query.length === 0;
   const needsMoreCharacters =
     hasInteracted && query.length > 0 && query.length < 2;
+
+  const renderLocationItem = (
+    place: Location,
+    sectionTitle: string,
+    extraActions?: React.ReactNode,
+  ) => (
+    <List.Item
+      key={place.id}
+      icon={{ source: Icon.Pin, tintColor: Color.Orange }}
+      title={place.name}
+      subtitle={formatLocationSubtitle(place)}
+      accessories={[
+        {
+          text: `${place.latitude.toFixed(2)}, ${place.longitude.toFixed(2)}`,
+        },
+      ]}
+      actions={
+        <ActionPanel>
+          <Action.Push
+            title="Show Forecast"
+            icon={Icon.Cloud}
+            target={
+              <ForecastView
+                location={place}
+                temperatureUnit={temperatureUnit}
+                setTemperatureUnit={setTemperatureUnit}
+                addFavorite={addFavorite}
+                removeFavorite={removeFavorite}
+                isFavorite={isFavorite}
+                addToHistory={addToHistory}
+              />
+            }
+          />
+          <Action.CopyToClipboard
+            title="Copy Coordinates"
+            content={`${place.latitude.toFixed(5)}, ${place.longitude.toFixed(5)}`}
+          />
+          {isFavorite(place.id) ? (
+            <Action
+              title="Remove from Favorites"
+              icon={Icon.StarDisabled}
+              onAction={() => removeFavorite(place.id)}
+            />
+          ) : (
+            <Action
+              title="Add to Favorites"
+              icon={Icon.Star}
+              onAction={() => addFavorite(place)}
+            />
+          )}
+          {extraActions}
+          {buildCommonActions(temperatureUnit, setTemperatureUnit)}
+        </ActionPanel>
+      }
+    />
+  );
 
   return (
     <List
@@ -967,41 +1426,29 @@ export default function Command() {
           />
         </List.Section>
       ) : null}
+      {!query && favorites.length > 0 ? (
+        <List.Section title="Favorite Places">
+          {favorites.map((place) => renderLocationItem(place, "Favorites"))}
+        </List.Section>
+      ) : null}
+      {!query && history.length > 0 ? (
+        <List.Section title="Recent Searches">
+          {history.map((place) =>
+            renderLocationItem(
+              place,
+              "Recent Searches",
+              <Action
+                title="Clear History"
+                icon={Icon.Trash}
+                onAction={clearHistory}
+              />,
+            ),
+          )}
+        </List.Section>
+      ) : null}
       {places.length > 0 ? (
         <List.Section title="Matching Places">
-          {places.map((place) => (
-            <List.Item
-              key={place.id}
-              icon={{ source: Icon.Pin, tintColor: Color.Orange }}
-              title={place.name}
-              subtitle={formatLocationSubtitle(place)}
-              accessories={[
-                {
-                  text: `${place.latitude.toFixed(2)}, ${place.longitude.toFixed(2)}`,
-                },
-              ]}
-              actions={
-                <ActionPanel>
-                  <Action.Push
-                    title="Show Forecast"
-                    icon={Icon.Cloud}
-                    target={
-                      <ForecastView
-                        location={place}
-                        temperatureUnit={temperatureUnit}
-                        setTemperatureUnit={setTemperatureUnit}
-                      />
-                    }
-                  />
-                  <Action.CopyToClipboard
-                    title="Copy Coordinates"
-                    content={`${place.latitude.toFixed(5)}, ${place.longitude.toFixed(5)}`}
-                  />
-                  {buildCommonActions(temperatureUnit, setTemperatureUnit)}
-                </ActionPanel>
-              }
-            />
-          ))}
+          {places.map((place) => renderLocationItem(place, "Matching Places"))}
         </List.Section>
       ) : null}
     </List>

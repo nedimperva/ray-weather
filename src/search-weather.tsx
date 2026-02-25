@@ -185,6 +185,28 @@ function iconForAqi(aqi: number): Icon {
   return Icon.CheckCircle;
 }
 
+function colorForTemperature(tempC: number): Color {
+  if (tempC <= 0) return Color.Blue;
+  if (tempC <= 10) return Color.Magenta;
+  if (tempC <= 20) return Color.Green;
+  if (tempC <= 28) return Color.Orange;
+  return Color.Red;
+}
+
+function colorForPrecipitation(mm: number): Color {
+  if (mm === 0) return Color.SecondaryText;
+  if (mm < 1) return Color.Blue;
+  if (mm < 5) return Color.Orange;
+  return Color.Red;
+}
+
+function colorForWind(speedMs?: number): Color {
+  if (speedMs === undefined) return Color.SecondaryText;
+  if (speedMs < 5) return Color.Green;
+  if (speedMs < 10) return Color.Orange;
+  return Color.Red;
+}
+
 function aqiLabel(aqi: number): string {
   if (aqi >= 4) {
     return "Unhealthy";
@@ -1083,18 +1105,12 @@ function DayDetailsView(props: {
             key={hour.id}
             icon={{
               source: iconForSymbol(hour.symbolCode),
-              tintColor: Color.Blue,
+              tintColor: colorForTemperature(hour.temperatureC),
             }}
             title={hour.localTimeLabel}
             subtitle={hour.condition}
             accessories={[
               { text: formatTemperature(hour.temperatureC, temperatureUnit) },
-              {
-                text: `Feels ${formatTemperature(
-                  hour.feelsLikeC,
-                  temperatureUnit,
-                )}`,
-              },
               { text: `${hour.precipitationMm.toFixed(1)} mm` },
               {
                 text:
@@ -1250,10 +1266,19 @@ function ForecastView(props: {
                   day.maxTempC,
                   temperatureUnit,
                 ),
+                color: colorForTemperature(day.maxTempC),
               },
-              { text: `${day.precipitationMm.toFixed(1)} mm` },
+              {
+                text: `${day.precipitationMm.toFixed(1)} mm`,
+                color: colorForPrecipitation(day.precipitationMm),
+              },
               ...(day.avgWindSpeedMs !== undefined
-                ? [{ text: `${day.avgWindSpeedMs.toFixed(1)} m/s` }]
+                ? [
+                    {
+                      text: `${day.avgWindSpeedMs.toFixed(1)} m/s`,
+                      color: colorForWind(day.avgWindSpeedMs),
+                    },
+                  ]
                 : []),
             ];
 
@@ -1262,7 +1287,7 @@ function ForecastView(props: {
                 key={day.dateKey}
                 icon={{
                   source: iconForSymbol(day.symbolCode),
-                  tintColor: Color.Blue,
+                  tintColor: colorForTemperature(day.maxTempC),
                 }}
                 title={`${day.label} (${day.shortDate})`}
                 subtitle={day.condition}

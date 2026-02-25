@@ -9,7 +9,7 @@ import {
   Toast,
 } from "@raycast/api";
 import { showFailureToast, useFetch } from "@raycast/utils";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import type {
   TemperatureUnit,
   Location,
@@ -285,19 +285,23 @@ function normalizeTemperatureUnit(
 
 function useLocalStorage<T>(key: string, defaultValue: T) {
   const [value, setValue] = useState<T>(defaultValue);
+  const isInitialized = useRef(false);
 
   useEffect(() => {
+    if (isInitialized.current) return;
+    isInitialized.current = true;
+
     void (async () => {
       const saved = await LocalStorage.getItem<string>(key);
       if (saved) {
         try {
           setValue(JSON.parse(saved));
         } catch {
-          setValue(defaultValue);
+          // keep default value
         }
       }
     })();
-  }, [key, defaultValue]);
+  }, [key]);
 
   const updateValue = useCallback(
     (newValue: T) => {
@@ -313,8 +317,12 @@ function useLocalStorage<T>(key: string, defaultValue: T) {
 function useTemperatureUnit() {
   const [temperatureUnit, setTemperatureUnitState] =
     useState<TemperatureUnit>("celsius");
+  const isInitialized = useRef(false);
 
   useEffect(() => {
+    if (isInitialized.current) return;
+    isInitialized.current = true;
+
     void (async () => {
       const savedUnit = await LocalStorage.getItem<string>(
         TEMPERATURE_UNIT_STORAGE_KEY,
@@ -323,14 +331,14 @@ function useTemperatureUnit() {
     })();
   }, []);
 
-  const setTemperatureUnit = (unit: TemperatureUnit) => {
+  const setTemperatureUnit = useCallback((unit: TemperatureUnit) => {
     setTemperatureUnitState(unit);
     void LocalStorage.setItem(TEMPERATURE_UNIT_STORAGE_KEY, unit);
     void showToast({
       style: Toast.Style.Success,
       title: `Temperature Unit: ${unit === "celsius" ? "Celsius" : "Fahrenheit"}`,
     });
-  };
+  }, []);
 
   return { temperatureUnit, setTemperatureUnit };
 }
@@ -702,15 +710,24 @@ function buildDailyForecast(
 }
 
 function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [debouncedValue, setDebouncedValue] = useState(value);
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    timeoutRef.current = setTimeout(() => {
       setDebouncedValue(value);
     }, delayMs);
 
-    return () => clearTimeout(timeout);
-  }, [delayMs, value]);
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [value, delayMs]);
 
   return debouncedValue;
 }
@@ -719,7 +736,11 @@ function usePlaceSearch(searchText: string) {
   const debouncedText = useDebouncedValue(searchText, 250);
   const query = debouncedText.trim();
   const shouldFetch = query.length >= 2;
-  const url = `${GEOCODE_API}?name=${encodeURIComponent(query)}&count=8&language=en&format=json`;
+  const url = useMemo(
+    () =>
+      `${GEOCODE_API}?name=${encodeURIComponent(query)}&count=8&language=en&format=json`,
+    [query],
+  );
 
   return useFetch(url, {
     execute: shouldFetch,
@@ -770,19 +791,31 @@ function useCachedFetch<T>(url: string, options?: FetchOptions) {
 }
 
 function useForecast(location: Location) {
-  const url = `${MET_NO_FORECAST_API}?lat=${location.latitude.toFixed(4)}&lon=${location.longitude.toFixed(4)}`;
+  const url = useMemo(
+    () =>
+      `${MET_NO_FORECAST_API}?lat=${location.latitude.toFixed(4)}&lon=${location.longitude.toFixed(4)}`,
+    [location.latitude, location.longitude],
+  );
 
   return useCachedFetch<MetNoForecastResponse>(url);
 }
 
 function useSunEvents(location: Location, dateKey: string) {
-  const url = `${MET_NO_SUNRISE_API}?lat=${location.latitude.toFixed(4)}&lon=${location.longitude.toFixed(4)}&date=${dateKey}`;
+  const url = useMemo(
+    () =>
+      `${MET_NO_SUNRISE_API}?lat=${location.latitude.toFixed(4)}&lon=${location.longitude.toFixed(4)}&date=${dateKey}`,
+    [location.latitude, location.longitude, dateKey],
+  );
 
   return useCachedFetch<MetNoSunResponse>(url);
 }
 
 function useAirQuality(location: Location) {
-  const url = `${AIR_QUALITY_API}?latitude=${location.latitude}&longitude=${location.longitude}&hourly=us_aqi,pm10,pm2_5,ozone,nitrogen_dioxide,carbon_monoxide&forecast_days=1&timeformat=unixtime`;
+  const url = useMemo(
+    () =>
+      `${AIR_QUALITY_API}?latitude=${location.latitude}&longitude=${location.longitude}&hourly=us_aqi,pm10,pm2_5,ozone,nitrogen_dioxide,carbon_monoxide&forecast_days=1&timeformat=unixtime`,
+    [location.latitude, location.longitude],
+  );
 
   return useCachedFetch<{
     hourly?: {
@@ -798,7 +831,11 @@ function useAirQuality(location: Location) {
 }
 
 function useWeatherAlerts(location: Location) {
-  const url = `${MET_NO_ALERTS_API}?lat=${location.latitude}&lon=${location.longitude}`;
+  const url = useMemo(
+    () =>
+      `${MET_NO_ALERTS_API}?lat=${location.latitude}&lon=${location.longitude}`,
+    [location.latitude, location.longitude],
+  );
 
   return useCachedFetch<{
     features?: Array<{
@@ -1349,60 +1386,70 @@ export default function Command() {
   const needsMoreCharacters =
     hasInteracted && query.length > 0 && query.length < 2;
 
-  const renderLocationItem = (
-    place: Location,
-    sectionTitle: string,
-    extraActions?: React.ReactNode,
-  ) => (
-    <List.Item
-      key={place.id}
-      icon={{ source: Icon.Pin, tintColor: Color.Orange }}
-      title={place.name}
-      subtitle={formatLocationSubtitle(place)}
-      accessories={[
-        {
-          text: `${place.latitude.toFixed(2)}, ${place.longitude.toFixed(2)}`,
-        },
-      ]}
-      actions={
-        <ActionPanel>
-          <Action.Push
-            title="Show Forecast"
-            icon={Icon.Cloud}
-            target={
-              <ForecastView
-                location={place}
-                temperatureUnit={temperatureUnit}
-                setTemperatureUnit={setTemperatureUnit}
-                addFavorite={addFavorite}
-                removeFavorite={removeFavorite}
-                isFavorite={isFavorite}
-                addToHistory={addToHistory}
+  const renderLocationItem = useCallback(
+    (
+      place: Location,
+      _sectionTitle: string,
+      extraActions?: React.ReactNode,
+    ) => (
+      <List.Item
+        key={place.id}
+        icon={{ source: Icon.Pin, tintColor: Color.Orange }}
+        title={place.name}
+        subtitle={formatLocationSubtitle(place)}
+        accessories={[
+          {
+            text: `${place.latitude.toFixed(2)}, ${place.longitude.toFixed(2)}`,
+          },
+        ]}
+        actions={
+          <ActionPanel>
+            <Action.Push
+              title="Show Forecast"
+              icon={Icon.Cloud}
+              target={
+                <ForecastView
+                  location={place}
+                  temperatureUnit={temperatureUnit}
+                  setTemperatureUnit={setTemperatureUnit}
+                  addFavorite={addFavorite}
+                  removeFavorite={removeFavorite}
+                  isFavorite={isFavorite}
+                  addToHistory={addToHistory}
+                />
+              }
+            />
+            <Action.CopyToClipboard
+              title="Copy Coordinates"
+              content={`${place.latitude.toFixed(5)}, ${place.longitude.toFixed(5)}`}
+            />
+            {isFavorite(place.id) ? (
+              <Action
+                title="Remove from Favorites"
+                icon={Icon.StarDisabled}
+                onAction={() => removeFavorite(place.id)}
               />
-            }
-          />
-          <Action.CopyToClipboard
-            title="Copy Coordinates"
-            content={`${place.latitude.toFixed(5)}, ${place.longitude.toFixed(5)}`}
-          />
-          {isFavorite(place.id) ? (
-            <Action
-              title="Remove from Favorites"
-              icon={Icon.StarDisabled}
-              onAction={() => removeFavorite(place.id)}
-            />
-          ) : (
-            <Action
-              title="Add to Favorites"
-              icon={Icon.Star}
-              onAction={() => addFavorite(place)}
-            />
-          )}
-          {extraActions}
-          {buildCommonActions(temperatureUnit, setTemperatureUnit)}
-        </ActionPanel>
-      }
-    />
+            ) : (
+              <Action
+                title="Add to Favorites"
+                icon={Icon.Star}
+                onAction={() => addFavorite(place)}
+              />
+            )}
+            {extraActions}
+            {buildCommonActions(temperatureUnit, setTemperatureUnit)}
+          </ActionPanel>
+        }
+      />
+    ),
+    [
+      temperatureUnit,
+      setTemperatureUnit,
+      addFavorite,
+      removeFavorite,
+      isFavorite,
+      addToHistory,
+    ],
   );
 
   return (

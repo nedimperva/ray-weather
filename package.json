@@ -4,13 +4,12 @@
   "title": "YR.NO Weather",
   "description": "Quickly check yr.no weather for today and upcoming days by place name.",
   "icon": "icon.png",
-  "author": "you",
+  "author": "nedim_perva",
   "categories": [
-    "Productivity",
     "Other"
   ],
   "license": "MIT",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "platforms": [
     "Windows"
   ],
@@ -20,6 +19,67 @@
       "title": "Search Weather",
       "description": "Check yr.no forecast for today and next days",
       "mode": "view"
+    },
+    {
+      "name": "menu-bar-weather",
+      "title": "Menu Bar Weather",
+      "description": "Show current weather in the menu bar for a pinned location",
+      "mode": "menu-bar",
+      "interval": "30m"
+    }
+  ],
+  "preferences": [
+    {
+      "name": "temperatureUnit",
+      "type": "dropdown",
+      "title": "Temperature Unit",
+      "description": "Choose the temperature unit for display",
+      "required": false,
+      "default": "celsius",
+      "data": [
+        { "title": "Celsius (°C)", "value": "celsius" },
+        { "title": "Fahrenheit (°F)", "value": "fahrenheit" }
+      ]
+    },
+    {
+      "name": "windSpeedUnit",
+      "type": "dropdown",
+      "title": "Wind Speed Unit",
+      "description": "Choose the wind speed unit for display",
+      "required": false,
+      "default": "ms",
+      "data": [
+        { "title": "m/s", "value": "ms" },
+        { "title": "km/h", "value": "kmh" },
+        { "title": "mph", "value": "mph" },
+        { "title": "Knots", "value": "knots" }
+      ]
+    },
+    {
+      "name": "precipitationUnit",
+      "type": "dropdown",
+      "title": "Precipitation Unit",
+      "description": "Choose the precipitation unit for display",
+      "required": false,
+      "default": "mm",
+      "data": [
+        { "title": "Millimeters (mm)", "value": "mm" },
+        { "title": "Inches (in)", "value": "inches" }
+      ]
+    },
+    {
+      "name": "forecastDays",
+      "type": "dropdown",
+      "title": "Forecast Days",
+      "description": "Number of forecast days to display",
+      "required": false,
+      "default": "10",
+      "data": [
+        { "title": "3 days", "value": "3" },
+        { "title": "5 days", "value": "5" },
+        { "title": "7 days", "value": "7" },
+        { "title": "10 days", "value": "10" }
+      ]
     }
   ],
   "scripts": {

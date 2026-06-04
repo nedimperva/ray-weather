@@ -41,6 +41,10 @@ Version 2.0 should make the extension feel less like a weather table and more li
   - Severe Weather Alerts command
   - Default-location alert view
   - Favorite-location alert scan with severity context
+- Completed commute and decision workflow:
+  - Commute Forecast command
+  - Configurable morning/evening commute windows
+  - "Should I..." actions for umbrella, jacket, walking, and driving
 
 ## v2.0 Milestones
 

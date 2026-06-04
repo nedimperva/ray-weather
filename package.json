@@ -39,6 +39,12 @@
       "mode": "view"
     },
     {
+      "name": "commute-forecast",
+      "title": "Commute Forecast",
+      "description": "Summarize morning and evening commute conditions for the default location",
+      "mode": "view"
+    },
+    {
       "name": "severe-weather-alerts",
       "title": "Severe Weather Alerts",
       "description": "Check active weather alerts for the pinned location and favorites",
@@ -119,6 +125,70 @@
         { "title": "Feels like", "value": "feels-like" },
         { "title": "Location + temp", "value": "location-temp" },
         { "title": "Compact icon only", "value": "compact" }
+      ]
+    },
+    {
+      "name": "morningCommuteStart",
+      "type": "dropdown",
+      "title": "Morning Commute Start",
+      "description": "Start hour for morning commute forecast",
+      "required": false,
+      "default": "7",
+      "data": [
+        { "title": "5:00", "value": "5" },
+        { "title": "6:00", "value": "6" },
+        { "title": "7:00", "value": "7" },
+        { "title": "8:00", "value": "8" },
+        { "title": "9:00", "value": "9" },
+        { "title": "10:00", "value": "10" }
+      ]
+    },
+    {
+      "name": "morningCommuteEnd",
+      "type": "dropdown",
+      "title": "Morning Commute End",
+      "description": "End hour for morning commute forecast",
+      "required": false,
+      "default": "9",
+      "data": [
+        { "title": "6:00", "value": "6" },
+        { "title": "7:00", "value": "7" },
+        { "title": "8:00", "value": "8" },
+        { "title": "9:00", "value": "9" },
+        { "title": "10:00", "value": "10" },
+        { "title": "11:00", "value": "11" }
+      ]
+    },
+    {
+      "name": "eveningCommuteStart",
+      "type": "dropdown",
+      "title": "Evening Commute Start",
+      "description": "Start hour for evening commute forecast",
+      "required": false,
+      "default": "16",
+      "data": [
+        { "title": "14:00", "value": "14" },
+        { "title": "15:00", "value": "15" },
+        { "title": "16:00", "value": "16" },
+        { "title": "17:00", "value": "17" },
+        { "title": "18:00", "value": "18" },
+        { "title": "19:00", "value": "19" }
+      ]
+    },
+    {
+      "name": "eveningCommuteEnd",
+      "type": "dropdown",
+      "title": "Evening Commute End",
+      "description": "End hour for evening commute forecast",
+      "required": false,
+      "default": "18",
+      "data": [
+        { "title": "15:00", "value": "15" },
+        { "title": "16:00", "value": "16" },
+        { "title": "17:00", "value": "17" },
+        { "title": "18:00", "value": "18" },
+        { "title": "19:00", "value": "19" },
+        { "title": "20:00", "value": "20" }
       ]
     }
   ],

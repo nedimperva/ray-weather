@@ -8,12 +8,30 @@ export type WeatherDecisionTag = {
 
 export type HourlyPeriod = "Night" | "Morning" | "Afternoon" | "Evening";
 
+export type ShouldIDecision = {
+  id: "umbrella" | "jacket" | "walk" | "drive";
+  question: string;
+  answer: string;
+  reason: string;
+  color: Color;
+};
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
 function firstRainHour(day: DailyForecast): HourlyForecast | undefined {
   return day.hourly.find((hour) => hour.precipitationMm >= 0.1);
+}
+
+function hoursInWindow(
+  day: DailyForecast,
+  startHour: number,
+  endHour: number,
+): HourlyForecast[] {
+  return day.hourly.filter(
+    (hour) => hour.hour >= startHour && hour.hour <= endHour,
+  );
 }
 
 export function getCurrentHour(day: DailyForecast): HourlyForecast | undefined {
@@ -88,6 +106,130 @@ export function buildDecisionTags(
   }
 
   return tags.slice(0, 4);
+}
+
+export function buildShouldIDecisions(
+  day: DailyForecast,
+  maxUvIndex?: number,
+  aqi?: number,
+  alertCount = 0,
+): ShouldIDecision[] {
+  const rainyHour = firstRainHour(day);
+  const maxWind = Math.max(...day.hourly.map((hour) => hour.windSpeedMs ?? 0));
+  const morningLow = Math.min(
+    ...hoursInWindow(day, 5, 10).map((hour) => hour.feelsLikeC),
+    day.minFeelsLikeC,
+  );
+  const afternoon = hoursInWindow(day, 12, 18);
+  const afternoonRain = afternoon.reduce(
+    (total, hour) => total + hour.precipitationMm,
+    0,
+  );
+  const fogRisk = (day.avgFogCoveragePct ?? 0) >= 30;
+
+  const umbrella =
+    day.precipitationMm >= 2 || afternoonRain >= 1 || rainyHour !== undefined
+      ? {
+          answer: "Yes",
+          reason: rainyHour
+            ? `rain starts around ${rainyHour.localTimeLabel}`
+            : `${day.precipitationMm.toFixed(1)} mm expected`,
+          color: Color.Blue,
+        }
+      : {
+          answer: "No",
+          reason: "meaningful rain is unlikely",
+          color: Color.Green,
+        };
+
+  const jacket =
+    morningLow <= 8 || day.maxTempC <= 14 || maxWind >= 8
+      ? {
+          answer: "Yes",
+          reason:
+            morningLow <= 8
+              ? `feels like ${morningLow.toFixed(0)}°C in the morning`
+              : maxWind >= 8
+                ? "wind will make it feel cooler"
+                : "the day stays cool",
+          color: Color.Blue,
+        }
+      : {
+          answer: "No",
+          reason: "temperatures should stay comfortable",
+          color: Color.Green,
+        };
+
+  const walkRisk =
+    alertCount > 0 ||
+    day.precipitationMm >= 3 ||
+    maxWind >= 10 ||
+    (maxUvIndex ?? 0) >= 8 ||
+    (aqi ?? 0) > 100;
+  const walk = walkRisk
+    ? {
+        answer: "Maybe later",
+        reason:
+          alertCount > 0
+            ? "active weather alert"
+            : day.precipitationMm >= 3
+              ? "rain may interrupt plans"
+              : maxWind >= 10
+                ? "wind is high"
+                : (aqi ?? 0) > 100
+                  ? "air quality is reduced"
+                  : "UV is high",
+        color: Color.Orange,
+      }
+    : {
+        answer: "Yes",
+        reason: "conditions look manageable",
+        color: Color.Green,
+      };
+
+  const driveRisk =
+    alertCount > 0 || fogRisk || maxWind >= 12 || day.precipitationMm >= 5;
+  const drive = driveRisk
+    ? {
+        answer: "Use caution",
+        reason:
+          alertCount > 0
+            ? "active weather alert"
+            : fogRisk
+              ? "fog coverage is elevated"
+              : maxWind >= 12
+                ? "strong wind is possible"
+                : "heavier rain is possible",
+        color: Color.Orange,
+      }
+    : {
+        answer: "Yes",
+        reason: "no major driving hazards in the forecast",
+        color: Color.Green,
+      };
+
+  return [
+    {
+      id: "umbrella",
+      question: "Should I bring an umbrella?",
+      ...umbrella,
+    },
+    {
+      id: "jacket",
+      question: "Should I wear a jacket?",
+      ...jacket,
+    },
+    {
+      id: "walk",
+      question: "Good time for a walk?",
+      ...walk,
+    },
+    {
+      id: "drive",
+      question: "Safe to drive?",
+      ...drive,
+    },
+  ];
 }
 
 export function buildComfortScore(

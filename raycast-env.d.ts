@@ -17,7 +17,15 @@ type ExtensionPreferences = {
   /** Forecast Days - Number of forecast days to display */
   "forecastDays": "3" | "5" | "7" | "10",
   /** Menu Bar Display - Choose what appears in the menu bar title */
-  "menuBarDisplayMode": "temp-only" | "temp-condition" | "temp-rain" | "feels-like" | "location-temp" | "compact"
+  "menuBarDisplayMode": "temp-only" | "temp-condition" | "temp-rain" | "feels-like" | "location-temp" | "compact",
+  /** Morning Commute Start - Start hour for morning commute forecast */
+  "morningCommuteStart": "5" | "6" | "7" | "8" | "9" | "10",
+  /** Morning Commute End - End hour for morning commute forecast */
+  "morningCommuteEnd": "6" | "7" | "8" | "9" | "10" | "11",
+  /** Evening Commute Start - Start hour for evening commute forecast */
+  "eveningCommuteStart": "14" | "15" | "16" | "17" | "18" | "19",
+  /** Evening Commute End - End hour for evening commute forecast */
+  "eveningCommuteEnd": "15" | "16" | "17" | "18" | "19" | "20"
 }
 
 /** Preferences accessible in all the extension's commands */
@@ -32,6 +40,8 @@ declare namespace Preferences {
   export type CompareWeather = ExtensionPreferences & {}
   /** Preferences accessible in the `weekend-planner` command */
   export type WeekendPlanner = ExtensionPreferences & {}
+  /** Preferences accessible in the `commute-forecast` command */
+  export type CommuteForecast = ExtensionPreferences & {}
   /** Preferences accessible in the `severe-weather-alerts` command */
   export type SevereWeatherAlerts = ExtensionPreferences & {}
   /** Preferences accessible in the `menu-bar-weather` command */
@@ -47,6 +57,8 @@ declare namespace Arguments {
   export type CompareWeather = {}
   /** Arguments passed to the `weekend-planner` command */
   export type WeekendPlanner = {}
+  /** Arguments passed to the `commute-forecast` command */
+  export type CommuteForecast = {}
   /** Arguments passed to the `severe-weather-alerts` command */
   export type SevereWeatherAlerts = {}
   /** Arguments passed to the `menu-bar-weather` command */

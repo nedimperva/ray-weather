@@ -36,10 +36,11 @@ import {
   formatIsoTimeInTimezone,
   getCurrentHour,
   locationSummary,
+  parseWeatherAlerts,
 } from "./utils";
 import { formatTemperature, formatTemperatureRange } from "./utils/temperature";
 import { formatPrecipitation, formatWindSpeed } from "./utils/units";
-import { CommonActions } from "./components";
+import { CommonActions, ShouldIActions } from "./components";
 
 function BriefView(props: { location: Location }) {
   const { location } = props;
@@ -83,25 +84,10 @@ function BriefView(props: { location: Location }) {
     }
   }, [sunError]);
 
-  const alerts: WeatherAlert[] = useMemo(() => {
-    const result: WeatherAlert[] = [];
-    const features = alertsData?.features ?? [];
-    for (const feature of features) {
-      const p = feature.properties;
-      if (p?.event) {
-        result.push({
-          area: p.area ?? "",
-          event: p.event,
-          headline: p.headline ?? "",
-          description: p.description ?? "",
-          severity:
-            (p.severity?.toLowerCase() as WeatherAlert["severity"]) ??
-            "unknown",
-        });
-      }
-    }
-    return result;
-  }, [alertsData]);
+  const alerts: WeatherAlert[] = useMemo(
+    () => parseWeatherAlerts(alertsData),
+    [alertsData],
+  );
 
   const currentAqi = useMemo(() => {
     const values = airQualityData?.hourly?.us_aqi ?? [];
@@ -259,6 +245,12 @@ function BriefView(props: { location: Location }) {
                     icon={Icon.ArrowClockwise}
                     onAction={revalidate}
                   />
+                  <ShouldIActions
+                    day={today}
+                    maxUvIndex={currentUv}
+                    aqi={currentAqi}
+                    alertCount={alerts.length}
+                  />
                   <CommonActions />
                 </ActionPanel>
               }
@@ -275,6 +267,12 @@ function BriefView(props: { location: Location }) {
                   <Action.CopyToClipboard
                     title="Copy Weather Brief"
                     content={copyBrief}
+                  />
+                  <ShouldIActions
+                    day={today}
+                    maxUvIndex={currentUv}
+                    aqi={currentAqi}
+                    alertCount={alerts.length}
                   />
                   <CommonActions />
                 </ActionPanel>

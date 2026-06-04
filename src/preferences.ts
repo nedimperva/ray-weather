@@ -17,6 +17,10 @@ export interface Preferences {
   precipitationUnit: PrecipitationUnit;
   forecastDays: string;
   menuBarDisplayMode: MenuBarDisplayMode;
+  morningCommuteStart: string;
+  morningCommuteEnd: string;
+  eveningCommuteStart: string;
+  eveningCommuteEnd: string;
 }
 
 export function getPrefs(): Preferences {
@@ -27,4 +31,24 @@ export function getForecastDays(): number {
   const prefs = getPrefs();
   const days = parseInt(prefs.forecastDays, 10);
   return [3, 5, 7, 10].includes(days) ? days : 10;
+}
+
+function hourPreference(value: string | undefined, fallback: number): number {
+  const hour = Number.parseInt(value ?? "", 10);
+  return Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : fallback;
+}
+
+export function getCommuteHours() {
+  const prefs = getPrefs();
+  const morningStart = hourPreference(prefs.morningCommuteStart, 7);
+  const morningEnd = hourPreference(prefs.morningCommuteEnd, 9);
+  const eveningStart = hourPreference(prefs.eveningCommuteStart, 16);
+  const eveningEnd = hourPreference(prefs.eveningCommuteEnd, 18);
+
+  return {
+    morningStart: Math.min(morningStart, morningEnd),
+    morningEnd: Math.max(morningStart, morningEnd),
+    eveningStart: Math.min(eveningStart, eveningEnd),
+    eveningEnd: Math.max(eveningStart, eveningEnd),
+  };
 }

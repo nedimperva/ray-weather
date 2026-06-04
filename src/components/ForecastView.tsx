@@ -42,12 +42,14 @@ import {
   formatIsoTimeInTimezone,
   getCurrentHour,
   locationSummary,
+  parseWeatherAlerts,
 } from "../utils";
 import { buildDailyForecast } from "../utils/forecast";
 import { AlertBadge } from "./AlertBadge";
 import { AirQualityView } from "./AirQualityView";
 import { DayDetailsView } from "./DayDetailsView";
 import { CommonActions } from "./CommonActions";
+import { ShouldIActions } from "./ShouldIActions";
 
 export function ForecastView(props: {
   location: Location;
@@ -76,25 +78,10 @@ export function ForecastView(props: {
   const { data: uvData } = useUVIndex(location, forecastDays);
   const { data: airQualityData } = useAirQuality(location);
 
-  const alerts: WeatherAlert[] = useMemo(() => {
-    const result: WeatherAlert[] = [];
-    const features = alertsData?.features ?? [];
-    for (const feature of features) {
-      const p = feature.properties;
-      if (p?.event) {
-        result.push({
-          area: p.area ?? "",
-          event: p.event,
-          headline: p.headline ?? "",
-          description: p.description ?? "",
-          severity:
-            (p.severity?.toLowerCase() as WeatherAlert["severity"]) ??
-            "unknown",
-        });
-      }
-    }
-    return result;
-  }, [alertsData]);
+  const alerts: WeatherAlert[] = useMemo(
+    () => parseWeatherAlerts(alertsData),
+    [alertsData],
+  );
 
   const dailyForecast = useMemo(() => {
     try {
@@ -284,6 +271,12 @@ export function ForecastView(props: {
                   icon={Icon.ArrowClockwise}
                   onAction={revalidate}
                 />
+                <ShouldIActions
+                  day={currentDay}
+                  maxUvIndex={currentUv}
+                  aqi={currentAqi}
+                  alertCount={alerts.length}
+                />
                 {favoriteAction}
                 <CommonActions />
               </ActionPanel>
@@ -438,6 +431,12 @@ export function ForecastView(props: {
                       title="Refresh Forecast"
                       icon={Icon.ArrowClockwise}
                       onAction={revalidate}
+                    />
+                    <ShouldIActions
+                      day={day}
+                      maxUvIndex={maxUvIndex}
+                      aqi={currentAqi}
+                      alertCount={alerts.length}
                     />
                     {favoriteAction}
                     <Action

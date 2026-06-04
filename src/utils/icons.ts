@@ -20,7 +20,7 @@ export function iconForSymbol(symbolCode: string): Icon {
 }
 
 export function iconForAqi(aqi: number): Icon {
-  if (aqi >= 4) return Icon.Warning;
-  if (aqi >= 2) return Icon.ExclamationMark;
+  if (aqi > 150) return Icon.Warning;
+  if (aqi > 50) return Icon.ExclamationMark;
   return Icon.CheckCircle;
 }

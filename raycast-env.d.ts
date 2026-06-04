@@ -15,7 +15,9 @@ type ExtensionPreferences = {
   /** Precipitation Unit - Choose the precipitation unit for display */
   "precipitationUnit": "mm" | "inches",
   /** Forecast Days - Number of forecast days to display */
-  "forecastDays": "3" | "5" | "7" | "10"
+  "forecastDays": "3" | "5" | "7" | "10",
+  /** Menu Bar Display - Choose what appears in the menu bar title */
+  "menuBarDisplayMode": "temp-only" | "temp-condition" | "temp-rain" | "feels-like" | "location-temp" | "compact"
 }
 
 /** Preferences accessible in all the extension's commands */

@@ -12,9 +12,11 @@ export function conditionLabelForSymbol(symbolCode: string): string {
 }
 
 export function aqiLabel(aqi: number): string {
-  if (aqi >= 4) return "Unhealthy";
-  if (aqi >= 3) return "Unhealthy for Sensitive";
-  if (aqi >= 2) return "Moderate";
+  if (aqi > 300) return "Hazardous";
+  if (aqi > 200) return "Very Unhealthy";
+  if (aqi > 150) return "Unhealthy";
+  if (aqi > 100) return "Unhealthy for Sensitive";
+  if (aqi > 50) return "Moderate";
   return "Good";
 }
 

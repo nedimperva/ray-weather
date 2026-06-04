@@ -3,12 +3,20 @@ import { getPreferenceValues } from "@raycast/api";
 export type TemperatureUnit = "celsius" | "fahrenheit";
 export type WindSpeedUnit = "ms" | "kmh" | "mph" | "knots";
 export type PrecipitationUnit = "mm" | "inches";
+export type MenuBarDisplayMode =
+  | "temp-only"
+  | "temp-condition"
+  | "temp-rain"
+  | "feels-like"
+  | "location-temp"
+  | "compact";
 
 export interface Preferences {
   temperatureUnit: TemperatureUnit;
   windSpeedUnit: WindSpeedUnit;
   precipitationUnit: PrecipitationUnit;
   forecastDays: string;
+  menuBarDisplayMode: MenuBarDisplayMode;
 }
 
 export function getPrefs(): Preferences {

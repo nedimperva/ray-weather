@@ -29,3 +29,10 @@ export function colorForUV(uvIndex: number): Color {
   if (uvIndex <= 10) return Color.Red;
   return Color.Purple;
 }
+
+export function colorForAqi(aqi: number): Color {
+  if (aqi <= 50) return Color.Green;
+  if (aqi <= 100) return Color.Yellow;
+  if (aqi <= 150) return Color.Orange;
+  return Color.Red;
+}

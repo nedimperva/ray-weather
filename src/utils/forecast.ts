@@ -9,6 +9,61 @@ import { calculateFeelsLikeC, toFahrenheit } from "./temperature";
 import { conditionLabelForSymbol } from "./formatting";
 import { dayLabelFromIndex } from "./formatting";
 
+function precipitationFromData(data: {
+  next_1_hours?: { details?: { precipitation_amount?: number } };
+  next_6_hours?: { details?: { precipitation_amount?: number } };
+  next_12_hours?: { details?: { precipitation_amount?: number } };
+}): { amountMm: number; windowHours: 1 | 6 | 12 } {
+  const next1 = data.next_1_hours?.details?.precipitation_amount;
+  if (typeof next1 === "number") {
+    return { amountMm: next1, windowHours: 1 };
+  }
+
+  const next6 = data.next_6_hours?.details?.precipitation_amount;
+  if (typeof next6 === "number") {
+    return { amountMm: next6, windowHours: 6 };
+  }
+
+  const next12 = data.next_12_hours?.details?.precipitation_amount;
+  if (typeof next12 === "number") {
+    return { amountMm: next12, windowHours: 12 };
+  }
+
+  return { amountMm: 0, windowHours: 1 };
+}
+
+function symbolFromData(data: {
+  next_1_hours?: { summary?: { symbol_code?: string } };
+  next_6_hours?: { summary?: { symbol_code?: string } };
+  next_12_hours?: { summary?: { symbol_code?: string } };
+}): string {
+  return (
+    data.next_1_hours?.summary?.symbol_code ??
+    data.next_6_hours?.summary?.symbol_code ??
+    data.next_12_hours?.summary?.symbol_code ??
+    "cloudy"
+  );
+}
+
+function buildRainWindowSummary(hourly: HourlyForecast[]): string | undefined {
+  const rainy = hourly.filter((hour) => hour.precipitationMm >= 0.1);
+  if (rainy.length === 0) return undefined;
+
+  const peak = rainy.reduce((max, hour) =>
+    hour.precipitationMm > max.precipitationMm ? hour : max,
+  );
+  const first = rainy[0];
+  const last = rainy[rainy.length - 1];
+  const label =
+    peak.precipitationMm >= 1 ? "Rain likely" : "Light rain possible";
+
+  if (first.localTimeLabel === last.localTimeLabel) {
+    return `${label} around ${first.localTimeLabel}`;
+  }
+
+  return `${label} ${first.localTimeLabel}-${last.localTimeLabel}, peak ${peak.localTimeLabel}`;
+}
+
 export function buildDailyForecast(
   timeseries: Array<{ time: string; data: unknown }>,
   timezone: string,
@@ -20,6 +75,8 @@ export function buildDailyForecast(
     {
       minTempC: number;
       maxTempC: number;
+      minTempTimeLabel?: string;
+      maxTempTimeLabel?: string;
       minFeelsLikeC: number;
       maxFeelsLikeC: number;
       precipitationMm: number;
@@ -30,8 +87,8 @@ export function buildDailyForecast(
       humidityCount: number;
       pressureTotal: number;
       pressureCount: number;
-      visibilityTotal: number;
-      visibilityCount: number;
+      fogCoverageTotal: number;
+      fogCoverageCount: number;
       uvIndexTotal: number;
       uvIndexCount: number;
       hourly: HourlyForecast[];
@@ -53,6 +110,14 @@ export function buildDailyForecast(
         summary?: { symbol_code?: string };
         details?: { precipitation_amount?: number };
       };
+      next_6_hours?: {
+        summary?: { symbol_code?: string };
+        details?: { precipitation_amount?: number };
+      };
+      next_12_hours?: {
+        summary?: { symbol_code?: string };
+        details?: { precipitation_amount?: number };
+      };
     };
     const date = new Date(entry.time);
     if (Number.isNaN(date.getTime())) continue;
@@ -62,18 +127,24 @@ export function buildDailyForecast(
 
     const dayKey = dateKeyInTimezone(date, safeTimeZone);
     const hour = localHourInTimezone(date, safeTimeZone);
-    const precipitation =
-      (data.next_1_hours?.details?.precipitation_amount as number) ?? 0;
-    const symbol =
-      (data.next_1_hours?.summary?.symbol_code as string) ?? "cloudy";
+    const localTimeLabel = timeLabelFormatter.format(date);
+    const { amountMm: precipitation, windowHours } =
+      precipitationFromData(data);
+    const symbol = symbolFromData(data);
     const windSpeed = data.instant?.details?.wind_speed as number | undefined;
+    const windDirection = data.instant?.details?.wind_from_direction as
+      | number
+      | undefined;
+    const windGust = data.instant?.details?.wind_speed_of_gust as
+      | number
+      | undefined;
     const humidity = data.instant?.details?.relative_humidity as
       | number
       | undefined;
     const pressure = data.instant?.details?.air_pressure_at_sea_level as
       | number
       | undefined;
-    const visibility = data.instant?.details?.fog_area_fraction as
+    const fogCoverage = data.instant?.details?.fog_area_fraction as
       | number
       | undefined;
     const feelsLikeC = calculateFeelsLikeC(tempC, windSpeed, humidity);
@@ -82,6 +153,8 @@ export function buildDailyForecast(
       groupedByDay.set(dayKey, {
         minTempC: tempC,
         maxTempC: tempC,
+        minTempTimeLabel: localTimeLabel,
+        maxTempTimeLabel: localTimeLabel,
         minFeelsLikeC: feelsLikeC,
         maxFeelsLikeC: feelsLikeC,
         precipitationMm: 0,
@@ -92,8 +165,8 @@ export function buildDailyForecast(
         humidityCount: 0,
         pressureTotal: 0,
         pressureCount: 0,
-        visibilityTotal: 0,
-        visibilityCount: 0,
+        fogCoverageTotal: 0,
+        fogCoverageCount: 0,
         uvIndexTotal: 0,
         uvIndexCount: 0,
         hourly: [],
@@ -102,8 +175,14 @@ export function buildDailyForecast(
     }
 
     const current = groupedByDay.get(dayKey)!;
-    current.minTempC = Math.min(current.minTempC, tempC);
-    current.maxTempC = Math.max(current.maxTempC, tempC);
+    if (tempC < current.minTempC) {
+      current.minTempC = tempC;
+      current.minTempTimeLabel = localTimeLabel;
+    }
+    if (tempC > current.maxTempC) {
+      current.maxTempC = tempC;
+      current.maxTempTimeLabel = localTimeLabel;
+    }
     current.minFeelsLikeC = Math.min(current.minFeelsLikeC, feelsLikeC);
     current.maxFeelsLikeC = Math.max(current.maxFeelsLikeC, feelsLikeC);
     current.precipitationMm += precipitation;
@@ -120,26 +199,28 @@ export function buildDailyForecast(
       current.pressureCount += 1;
       current.pressures.push(pressure);
     }
-    if (typeof visibility === "number") {
-      current.visibilityTotal += visibility;
-      current.visibilityCount += 1;
+    if (typeof fogCoverage === "number") {
+      current.fogCoverageTotal += fogCoverage;
+      current.fogCoverageCount += 1;
     }
 
     current.symbolCandidates.push({ symbol, hour });
     current.hourly.push({
       id: entry.time,
-      localTimeLabel: timeLabelFormatter.format(date),
+      localTimeLabel,
       hour,
       temperatureC: tempC,
       precipitationMm: precipitation,
+      precipitationWindowHours: windowHours,
       windSpeedMs: windSpeed,
+      windDirectionDeg: windDirection,
+      windGustMs: windGust,
       humidityPct: humidity,
       pressureHpa: pressure,
       feelsLikeC,
       symbolCode: symbol,
       condition: conditionLabelForSymbol(symbol),
-      visibilityKm:
-        visibility !== undefined ? (1 - visibility) * 10 : undefined,
+      fogCoveragePct: fogCoverage,
     });
   }
 
@@ -179,9 +260,10 @@ export function buildDailyForecast(
       current.pressureCount > 0
         ? current.pressureTotal / current.pressureCount
         : undefined;
-    const avgVisibilityKm =
-      current.visibilityCount > 0
-        ? (1 - current.visibilityTotal / current.visibilityCount) * 10
+    const sortedHourly = current.hourly.sort((a, b) => a.hour - b.hour);
+    const avgFogCoveragePct =
+      current.fogCoverageCount > 0
+        ? current.fogCoverageTotal / current.fogCoverageCount
         : undefined;
 
     let pressureTrend: "rising" | "falling" | "stable" = "stable";
@@ -208,6 +290,8 @@ export function buildDailyForecast(
       dayAndDate,
       minTempC: current.minTempC,
       maxTempC: current.maxTempC,
+      minTempTimeLabel: current.minTempTimeLabel,
+      maxTempTimeLabel: current.maxTempTimeLabel,
       minFeelsLikeC: current.minFeelsLikeC,
       maxFeelsLikeC: current.maxFeelsLikeC,
       minTempF: toFahrenheit(current.minTempC),
@@ -219,8 +303,9 @@ export function buildDailyForecast(
       avgHumidityPct,
       avgPressureHpa,
       pressureTrend,
-      avgVisibilityKm,
-      hourly: current.hourly.sort((a, b) => a.hour - b.hour),
+      avgFogCoveragePct,
+      rainWindowSummary: buildRainWindowSummary(sortedHourly),
+      hourly: sortedHourly,
     };
   });
 }

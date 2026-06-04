@@ -1,7 +1,17 @@
-import { Action, ActionPanel, Color, Icon, List } from "@raycast/api";
+import {
+  Action,
+  ActionPanel,
+  Color,
+  Icon,
+  List,
+  LocalStorage,
+  showToast,
+  Toast,
+} from "@raycast/api";
 import { showFailureToast } from "@raycast/utils";
 import { useEffect, useState, useCallback } from "react";
 import type { Location } from "./types";
+import { MENU_BAR_LOCATION_KEY } from "./constants";
 import {
   useFavoriteLocations,
   useSearchHistory,
@@ -12,8 +22,15 @@ import { ForecastView } from "./components";
 import { CommonActions } from "./components";
 
 export default function Command() {
-  const { favorites, addFavorite, removeFavorite, isFavorite } =
-    useFavoriteLocations();
+  const {
+    favorites,
+    addFavorite,
+    removeFavorite,
+    moveFavorite,
+    moveFavoriteToTop,
+    clearFavorites,
+    isFavorite,
+  } = useFavoriteLocations();
   const { history, addToHistory, clearHistory } = useSearchHistory();
   const [searchText, setSearchText] = useState("");
   const [hasInteracted, setHasInteracted] = useState(false);
@@ -29,6 +46,14 @@ export default function Command() {
   const shouldShowHint = query.length === 0;
   const needsMoreCharacters =
     hasInteracted && query.length > 0 && query.length < 2;
+
+  const pinToMenuBar = useCallback((place: Location) => {
+    void LocalStorage.setItem(MENU_BAR_LOCATION_KEY, JSON.stringify(place));
+    void showToast({
+      style: Toast.Style.Success,
+      title: `${place.name} pinned to menu bar`,
+    });
+  }, []);
 
   const renderLocationItem = useCallback(
     (
@@ -78,13 +103,18 @@ export default function Command() {
                 onAction={() => addFavorite(place)}
               />
             )}
+            <Action
+              title="Set as Menu Bar Location"
+              icon={Icon.Pin}
+              onAction={() => pinToMenuBar(place)}
+            />
             {extraActions}
             <CommonActions />
           </ActionPanel>
         }
       />
     ),
-    [addFavorite, removeFavorite, isFavorite, addToHistory],
+    [addFavorite, removeFavorite, isFavorite, pinToMenuBar, addToHistory],
   );
 
   return (
@@ -135,7 +165,39 @@ export default function Command() {
       ) : null}
       {!query && favorites.length > 0 ? (
         <List.Section title="Favorite Places">
-          {favorites.map((place) => renderLocationItem(place, "Favorites"))}
+          {favorites.map((place, index) =>
+            renderLocationItem(
+              place,
+              "Favorites",
+              <>
+                <Action
+                  title="Move Favorite up"
+                  icon={Icon.ArrowUp}
+                  shortcut={{ modifiers: ["cmd"], key: "arrowUp" }}
+                  onAction={() => moveFavorite(place.id, "up")}
+                />
+                <Action
+                  title="Move Favorite Down"
+                  icon={Icon.ArrowDown}
+                  shortcut={{ modifiers: ["cmd"], key: "arrowDown" }}
+                  onAction={() => moveFavorite(place.id, "down")}
+                />
+                {index === 0 ? null : (
+                  <Action
+                    title="Make First Favorite"
+                    icon={Icon.ArrowUpCircle}
+                    onAction={() => moveFavoriteToTop(place.id)}
+                  />
+                )}
+                <Action
+                  title="Remove All Favorites"
+                  icon={Icon.Trash}
+                  style={Action.Style.Destructive}
+                  onAction={clearFavorites}
+                />
+              </>,
+            ),
+          )}
         </List.Section>
       ) : null}
       {!query && history.length > 0 ? (

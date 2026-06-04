@@ -80,6 +80,22 @@
         { "title": "7 days", "value": "7" },
         { "title": "10 days", "value": "10" }
       ]
+    },
+    {
+      "name": "menuBarDisplayMode",
+      "type": "dropdown",
+      "title": "Menu Bar Display",
+      "description": "Choose what appears in the menu bar title",
+      "required": false,
+      "default": "temp-condition",
+      "data": [
+        { "title": "Temp only", "value": "temp-only" },
+        { "title": "Temp + condition", "value": "temp-condition" },
+        { "title": "Temp + rain", "value": "temp-rain" },
+        { "title": "Feels like", "value": "feels-like" },
+        { "title": "Location + temp", "value": "location-temp" },
+        { "title": "Compact icon only", "value": "compact" }
+      ]
     }
   ],
   "scripts": {

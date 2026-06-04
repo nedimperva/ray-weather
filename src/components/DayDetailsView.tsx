@@ -11,7 +11,12 @@ import {
   formatTemperatureRange,
 } from "../utils/temperature";
 import { formatWindSpeed, formatPrecipitation } from "../utils/units";
-import { formatIsoTimeInTimezone, locationSummary } from "../utils";
+import {
+  formatIsoTimeInTimezone,
+  formatWindDirection,
+  groupHourlyByPeriod,
+  locationSummary,
+} from "../utils";
 import { AlertBadge } from "./AlertBadge";
 import { CommonActions } from "./CommonActions";
 
@@ -46,7 +51,6 @@ export function DayDetailsView(props: {
     location.timezone,
   );
 
-  // Merge UV data into hourly forecasts
   const uvByHour = new Map<string, number>();
   if (uvData?.hourly?.time && uvData?.hourly?.uv_index) {
     for (let i = 0; i < uvData.hourly.time.length; i++) {
@@ -62,12 +66,13 @@ export function DayDetailsView(props: {
     }
   }
 
-  const pressureTrendIcon =
+  const hourlyGroups = groupHourlyByPeriod(day.hourly);
+  const pressureTrendLabel =
     day.pressureTrend === "rising"
-      ? "↑"
+      ? "rising"
       : day.pressureTrend === "falling"
-        ? "↓"
-        : "→";
+        ? "falling"
+        : "stable";
 
   return (
     <List
@@ -119,6 +124,35 @@ export function DayDetailsView(props: {
           }
         />
         <List.Item
+          title="Daily Temperature Timing"
+          subtitle={[
+            day.minTempTimeLabel
+              ? `Low ${formatTemperature(day.minTempC, prefs.temperatureUnit)} at ${day.minTempTimeLabel}`
+              : undefined,
+            day.maxTempTimeLabel
+              ? `High ${formatTemperature(day.maxTempC, prefs.temperatureUnit)} at ${day.maxTempTimeLabel}`
+              : undefined,
+          ]
+            .filter(Boolean)
+            .join(" - ")}
+          icon={Icon.Clock}
+          actions={
+            <ActionPanel>
+              <CommonActions />
+            </ActionPanel>
+          }
+        />
+        <List.Item
+          title="Rain Window"
+          subtitle={day.rainWindowSummary ?? "No meaningful rain window"}
+          icon={Icon.CloudRain}
+          actions={
+            <ActionPanel>
+              <CommonActions />
+            </ActionPanel>
+          }
+        />
+        <List.Item
           title="Sunrise / Sunset"
           subtitle={`${sunriseLabel} / ${sunsetLabel}`}
           icon={Icon.Sun}
@@ -156,7 +190,7 @@ export function DayDetailsView(props: {
           title="Pressure"
           subtitle={
             day.avgPressureHpa !== undefined
-              ? `${day.avgPressureHpa.toFixed(0)} hPa ${pressureTrendIcon}`
+              ? `${day.avgPressureHpa.toFixed(0)} hPa, ${pressureTrendLabel}`
               : "No data"
           }
           icon={Icon.Gauge}
@@ -167,13 +201,13 @@ export function DayDetailsView(props: {
           }
         />
         <List.Item
-          title="Visibility"
+          title="Fog Coverage"
           subtitle={
-            day.avgVisibilityKm !== undefined
-              ? `${day.avgVisibilityKm.toFixed(1)} km`
+            day.avgFogCoveragePct !== undefined
+              ? `${day.avgFogCoveragePct.toFixed(0)}% average`
               : "No data"
           }
-          icon={Icon.Eye}
+          icon={Icon.Cloud}
           actions={
             <ActionPanel>
               <CommonActions />
@@ -181,60 +215,80 @@ export function DayDetailsView(props: {
           }
         />
       </List.Section>
-      <List.Section title="Hourly Forecast">
-        {day.hourly.map((hour) => {
-          const uvIndex = uvByHour.get(hour.hour.toString());
-          return (
-            <List.Item
-              key={hour.id}
-              icon={{
-                source: iconForSymbol(hour.symbolCode),
-                tintColor: colorForTemperature(hour.temperatureC),
-              }}
-              title={hour.localTimeLabel}
-              subtitle={hour.condition}
-              accessories={[
-                {
-                  text: formatTemperature(
-                    hour.temperatureC,
-                    prefs.temperatureUnit,
-                  ),
-                },
-                {
-                  text: formatPrecipitation(
-                    hour.precipitationMm,
-                    prefs.precipitationUnit,
-                  ),
-                },
-                {
-                  text: formatWindSpeed(hour.windSpeedMs, prefs.windSpeedUnit),
-                },
-                {
-                  text:
-                    hour.humidityPct !== undefined
-                      ? `${Math.round(hour.humidityPct)}%`
-                      : "-",
-                },
-                ...(uvIndex !== undefined && uvIndex > 0
-                  ? [
-                      {
-                        tag: {
-                          value: `UV ${uvIndex.toFixed(0)}`,
-                          color: colorForUV(uvIndex),
-                        },
-                      },
-                    ]
-                  : []),
-              ]}
-              actions={
-                <ActionPanel>
-                  <CommonActions />
-                </ActionPanel>
-              }
-            />
-          );
-        })}
-      </List.Section>
+      {Object.entries(hourlyGroups).map(([period, hours]) =>
+        hours.length > 0 ? (
+          <List.Section key={period} title={period}>
+            {hours.map((hour) => {
+              const uvIndex = uvByHour.get(hour.hour.toString());
+              const windDirection = formatWindDirection(hour.windDirectionDeg);
+              return (
+                <List.Item
+                  key={hour.id}
+                  icon={{
+                    source: iconForSymbol(hour.symbolCode),
+                    tintColor: colorForTemperature(hour.temperatureC),
+                  }}
+                  title={hour.localTimeLabel}
+                  subtitle={hour.condition}
+                  accessories={[
+                    {
+                      text: formatTemperature(
+                        hour.temperatureC,
+                        prefs.temperatureUnit,
+                      ),
+                    },
+                    {
+                      text: formatPrecipitation(
+                        hour.precipitationMm,
+                        prefs.precipitationUnit,
+                      ),
+                    },
+                    {
+                      text: [
+                        formatWindSpeed(hour.windSpeedMs, prefs.windSpeedUnit),
+                        windDirection,
+                      ]
+                        .filter(Boolean)
+                        .join(" "),
+                    },
+                    ...(hour.windGustMs !== undefined
+                      ? [
+                          {
+                            text: `Gust ${formatWindSpeed(
+                              hour.windGustMs,
+                              prefs.windSpeedUnit,
+                            )}`,
+                          },
+                        ]
+                      : []),
+                    {
+                      text:
+                        hour.humidityPct !== undefined
+                          ? `${Math.round(hour.humidityPct)}%`
+                          : "-",
+                    },
+                    ...(uvIndex !== undefined && uvIndex > 0
+                      ? [
+                          {
+                            tag: {
+                              value: `UV ${uvIndex.toFixed(0)}`,
+                              color: colorForUV(uvIndex),
+                            },
+                          },
+                        ]
+                      : []),
+                  ]}
+                  actions={
+                    <ActionPanel>
+                      <CommonActions />
+                    </ActionPanel>
+                  }
+                />
+              );
+            })}
+          </List.Section>
+        ) : null,
+      )}
     </List>
   );
 }

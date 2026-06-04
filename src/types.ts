@@ -34,9 +34,27 @@ export type ForecastEntry = {
         air_pressure_at_sea_level?: number;
         fog_area_fraction?: number;
         fog_liquid_water_content?: number;
+        wind_from_direction?: number;
+        wind_speed_of_gust?: number;
       };
     };
     next_1_hours?: {
+      summary?: {
+        symbol_code?: string;
+      };
+      details?: {
+        precipitation_amount?: number;
+      };
+    };
+    next_6_hours?: {
+      summary?: {
+        symbol_code?: string;
+      };
+      details?: {
+        precipitation_amount?: number;
+      };
+    };
+    next_12_hours?: {
       summary?: {
         symbol_code?: string;
       };
@@ -49,6 +67,9 @@ export type ForecastEntry = {
 
 export type MetNoForecastResponse = {
   properties?: {
+    meta?: {
+      updated_at?: string;
+    };
     timeseries?: ForecastEntry[];
   };
 };
@@ -89,6 +110,8 @@ export type DailyForecast = {
   dayAndDate: string;
   minTempC: number;
   maxTempC: number;
+  minTempTimeLabel?: string;
+  maxTempTimeLabel?: string;
   minFeelsLikeC: number;
   maxFeelsLikeC: number;
   minTempF: number;
@@ -100,8 +123,13 @@ export type DailyForecast = {
   avgHumidityPct?: number;
   avgPressureHpa?: number;
   pressureTrend?: "rising" | "falling" | "stable";
-  avgVisibilityKm?: number;
+  avgFogCoveragePct?: number;
   maxUvIndex?: number;
+  rainWindowSummary?: string;
+  decisionTags?: string[];
+  comfortScore?: number;
+  personalitySummary?: string;
+  trendSummary?: string;
   hourly: HourlyForecast[];
 };
 
@@ -111,13 +139,16 @@ export type HourlyForecast = {
   hour: number;
   temperatureC: number;
   precipitationMm: number;
+  precipitationWindowHours: 1 | 6 | 12;
   windSpeedMs?: number;
+  windDirectionDeg?: number;
+  windGustMs?: number;
   humidityPct?: number;
   pressureHpa?: number;
   feelsLikeC: number;
   symbolCode: string;
   condition: string;
-  visibilityKm?: number;
+  fogCoveragePct?: number;
   uvIndex?: number;
 };
 
@@ -139,8 +170,8 @@ export type DailyAccumulator = {
   humidityCount: number;
   pressureTotal: number;
   pressureCount: number;
-  visibilityTotal: number;
-  visibilityCount: number;
+  fogCoverageTotal: number;
+  fogCoverageCount: number;
   uvIndexTotal: number;
   uvIndexCount: number;
   hourly: HourlyForecast[];

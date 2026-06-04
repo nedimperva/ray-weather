@@ -16,10 +16,10 @@ import {
   FAVORITE_LOCATIONS_KEY,
 } from "./constants";
 import { getPrefs } from "./preferences";
-import { formatTemperature } from "./utils/temperature";
+import { calculateFeelsLikeC, formatTemperature } from "./utils/temperature";
 import { formatWindSpeed, formatPrecipitation } from "./utils/units";
 import { conditionLabelForSymbol } from "./utils/formatting";
-import { ensureValidTimeZone } from "./utils/dates";
+import { ensureValidTimeZone, formatIsoTimeInTimezone } from "./utils/dates";
 
 function useMenuBarLocation() {
   const [location, setLocation] = useState<Location | null>(null);
@@ -109,6 +109,7 @@ export default function MenuBarWeather() {
     const tempC = details.air_temperature;
     const windSpeedMs = details.wind_speed;
     const humidityPct = details.relative_humidity;
+    const feelsLikeC = calculateFeelsLikeC(tempC, windSpeedMs, humidityPct);
     const symbolCode =
       entry.data?.next_1_hours?.summary?.symbol_code ?? "cloudy";
     const precipMm =
@@ -118,6 +119,7 @@ export default function MenuBarWeather() {
       tempC,
       windSpeedMs,
       humidityPct,
+      feelsLikeC,
       symbolCode,
       condition: conditionLabelForSymbol(symbolCode),
       precipMm,
@@ -172,8 +174,40 @@ export default function MenuBarWeather() {
   }
 
   const title = current
-    ? `${formatTemperature(current.tempC, prefs.temperatureUnit)} ${current.condition}`
-    : "Loading...";
+    ? (() => {
+        const temperature = formatTemperature(
+          current.tempC,
+          prefs.temperatureUnit,
+        );
+        switch (prefs.menuBarDisplayMode) {
+          case "temp-only":
+            return temperature;
+          case "temp-rain":
+            return `${temperature} ${formatPrecipitation(
+              current.precipMm,
+              prefs.precipitationUnit,
+            )}`;
+          case "feels-like":
+            return `Feels ${formatTemperature(
+              current.feelsLikeC,
+              prefs.temperatureUnit,
+            )}`;
+          case "location-temp":
+            return `${location.name} ${temperature}`;
+          case "compact":
+            return undefined;
+          case "temp-condition":
+          default:
+            return `${temperature} ${current.condition}`;
+        }
+      })()
+    : prefs.menuBarDisplayMode === "compact"
+      ? undefined
+      : "Loading...";
+  const updatedLabel = formatIsoTimeInTimezone(
+    data?.properties?.meta?.updated_at,
+    location.timezone,
+  );
 
   return (
     <MenuBarExtra
@@ -188,6 +222,9 @@ export default function MenuBarWeather() {
             <MenuBarExtra.Item
               title={`${formatTemperature(current.tempC, prefs.temperatureUnit)} - ${current.condition}`}
             />
+            <MenuBarExtra.Item
+              title={`Feels like: ${formatTemperature(current.feelsLikeC, prefs.temperatureUnit)}`}
+            />
             {current.windSpeedMs !== undefined && (
               <MenuBarExtra.Item
                 title={`Wind: ${formatWindSpeed(current.windSpeedMs, prefs.windSpeedUnit)}`}
@@ -201,6 +238,7 @@ export default function MenuBarWeather() {
             <MenuBarExtra.Item
               title={`Precipitation: ${formatPrecipitation(current.precipMm, prefs.precipitationUnit)}`}
             />
+            <MenuBarExtra.Item title={`Updated: ${updatedLabel}`} />
           </>
         )}
       </MenuBarExtra.Section>

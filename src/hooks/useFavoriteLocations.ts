@@ -35,6 +35,46 @@ export function useFavoriteLocations() {
     [favorites, setFavorites],
   );
 
+  const moveFavorite = useCallback(
+    (locationId: string, direction: "up" | "down") => {
+      const currentIndex = favorites.findIndex((f) => f.id === locationId);
+      if (currentIndex === -1) return;
+
+      const nextIndex =
+        direction === "up" ? currentIndex - 1 : currentIndex + 1;
+      if (nextIndex < 0 || nextIndex >= favorites.length) return;
+
+      const nextFavorites = [...favorites];
+      const [favorite] = nextFavorites.splice(currentIndex, 1);
+      if (!favorite) return;
+      nextFavorites.splice(nextIndex, 0, favorite);
+      setFavorites(nextFavorites);
+    },
+    [favorites, setFavorites],
+  );
+
+  const moveFavoriteToTop = useCallback(
+    (locationId: string) => {
+      const currentIndex = favorites.findIndex((f) => f.id === locationId);
+      if (currentIndex <= 0) return;
+
+      const nextFavorites = [...favorites];
+      const [favorite] = nextFavorites.splice(currentIndex, 1);
+      if (!favorite) return;
+      nextFavorites.unshift(favorite);
+      setFavorites(nextFavorites);
+    },
+    [favorites, setFavorites],
+  );
+
+  const clearFavorites = useCallback(() => {
+    setFavorites([]);
+    void showToast({
+      style: Toast.Style.Success,
+      title: "Favorites cleared",
+    });
+  }, [setFavorites]);
+
   const isFavorite = useCallback(
     (locationId: string) => {
       return favorites.some((f) => f.id === locationId);
@@ -42,5 +82,13 @@ export function useFavoriteLocations() {
     [favorites],
   );
 
-  return { favorites, addFavorite, removeFavorite, isFavorite };
+  return {
+    favorites,
+    addFavorite,
+    removeFavorite,
+    moveFavorite,
+    moveFavoriteToTop,
+    clearFavorites,
+    isFavorite,
+  };
 }

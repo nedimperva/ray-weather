@@ -33,6 +33,12 @@
       "mode": "view"
     },
     {
+      "name": "weekend-planner",
+      "title": "Weekend Planner",
+      "description": "Plan the upcoming weekend for the pinned or first favorite location",
+      "mode": "view"
+    },
+    {
       "name": "menu-bar-weather",
       "title": "Menu Bar Weather",
       "description": "Show current weather in the menu bar for a pinned location",
@@ -49,8 +55,8 @@
       "required": false,
       "default": "celsius",
       "data": [
-        { "title": "Celsius (°C)", "value": "celsius" },
-        { "title": "Fahrenheit (°F)", "value": "fahrenheit" }
+        { "title": "Celsius (\u00b0C)", "value": "celsius" },
+        { "title": "Fahrenheit (\u00b0F)", "value": "fahrenheit" }
       ]
     },
     {

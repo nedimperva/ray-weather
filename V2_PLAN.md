@@ -33,6 +33,10 @@ Version 2.0 should make the extension feel less like a weather table and more li
   - Compare Weather command
   - Favorite-to-favorite selection flow
   - Better-location recommendation with comfort score, rain, wind, AQI, UV, and alert context
+- Completed weekend workflow:
+  - Weekend Planner command
+  - Upcoming Saturday/Sunday extraction
+  - Better weekend day recommendation with comfort score, rain, wind, UV, and alert context
 
 ## v2.0 Milestones
 

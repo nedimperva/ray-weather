@@ -30,6 +30,8 @@ declare namespace Preferences {
   export type TodayWeatherBrief = ExtensionPreferences & {}
   /** Preferences accessible in the `compare-weather` command */
   export type CompareWeather = ExtensionPreferences & {}
+  /** Preferences accessible in the `weekend-planner` command */
+  export type WeekendPlanner = ExtensionPreferences & {}
   /** Preferences accessible in the `menu-bar-weather` command */
   export type MenuBarWeather = ExtensionPreferences & {}
 }
@@ -41,6 +43,8 @@ declare namespace Arguments {
   export type TodayWeatherBrief = {}
   /** Arguments passed to the `compare-weather` command */
   export type CompareWeather = {}
+  /** Arguments passed to the `weekend-planner` command */
+  export type WeekendPlanner = {}
   /** Arguments passed to the `menu-bar-weather` command */
   export type MenuBarWeather = {}
 }

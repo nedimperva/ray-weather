@@ -4,6 +4,7 @@ export { useSearchHistory } from "./useSearchHistory";
 export { useDebouncedValue } from "./useDebouncedValue";
 export { usePlaceSearch } from "./usePlaceSearch";
 export { useCachedFetch } from "./useCachedFetch";
+export { useDefaultLocation } from "./useDefaultLocation";
 export { useForecast } from "./useForecast";
 export { useSunEvents } from "./useSunEvents";
 export { useAirQuality } from "./useAirQuality";

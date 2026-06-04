@@ -12,6 +12,24 @@ Version 2.0 should make the extension feel less like a weather table and more li
 4. **Trust and polish**: show freshness, source attribution, accurate labels, and clean symbols.
 5. **Power workflows**: compare locations, plan weekends, check commutes, and answer quick "Should I..." questions.
 
+## Implementation Log
+
+- Completed v2 foundation:
+  - Now section
+  - Daily decision tags
+  - Comfort score
+  - Rain windows
+  - Min/max temperature timing
+  - Hourly grouping
+  - Menu bar display modes
+  - Search-result menu-bar pinning
+  - First favorite management actions
+  - Encoding polish
+- Completed v2 continuation:
+  - Shared default-location lookup for pinned location or first favorite
+  - Today's Weather Brief command
+  - Forecast, alert, AQI, UV, and geocoding source actions
+
 ## v2.0 Milestones
 
 ### 1. Highest Value Foundation

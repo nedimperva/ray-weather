@@ -21,6 +21,12 @@
       "mode": "view"
     },
     {
+      "name": "today-weather-brief",
+      "title": "Today's Weather Brief",
+      "description": "Show a compact briefing for the pinned or first favorite location",
+      "mode": "view"
+    },
+    {
       "name": "menu-bar-weather",
       "title": "Menu Bar Weather",
       "description": "Show current weather in the menu bar for a pinned location",

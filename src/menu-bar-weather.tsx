@@ -3,70 +3,21 @@ import {
   LaunchType,
   MenuBarExtra,
   launchCommand,
-  LocalStorage,
   openExtensionPreferences,
 } from "@raycast/api";
 import { showFailureToast, useFetch } from "@raycast/utils";
-import { useEffect, useMemo, useState, useRef } from "react";
-import type { Location, MetNoForecastResponse } from "./types";
-import {
-  MET_NO_FORECAST_API,
-  APP_USER_AGENT,
-  MENU_BAR_LOCATION_KEY,
-  FAVORITE_LOCATIONS_KEY,
-} from "./constants";
+import { useEffect, useMemo } from "react";
+import type { MetNoForecastResponse } from "./types";
+import { MET_NO_FORECAST_API, APP_USER_AGENT } from "./constants";
+import { useDefaultLocation } from "./hooks";
 import { getPrefs } from "./preferences";
 import { calculateFeelsLikeC, formatTemperature } from "./utils/temperature";
 import { formatWindSpeed, formatPrecipitation } from "./utils/units";
 import { conditionLabelForSymbol } from "./utils/formatting";
 import { ensureValidTimeZone, formatIsoTimeInTimezone } from "./utils/dates";
 
-function useMenuBarLocation() {
-  const [location, setLocation] = useState<Location | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const isInitialized = useRef(false);
-
-  useEffect(() => {
-    if (isInitialized.current) return;
-    isInitialized.current = true;
-
-    void (async () => {
-      // Try pinned location first
-      const pinned = await LocalStorage.getItem<string>(MENU_BAR_LOCATION_KEY);
-      if (pinned) {
-        try {
-          setLocation(JSON.parse(pinned));
-          setIsLoading(false);
-          return;
-        } catch {
-          // fall through
-        }
-      }
-
-      // Try first favorite
-      const favs = await LocalStorage.getItem<string>(FAVORITE_LOCATIONS_KEY);
-      if (favs) {
-        try {
-          const parsed = JSON.parse(favs) as Location[];
-          if (parsed.length > 0) {
-            setLocation(parsed[0]);
-            setIsLoading(false);
-            return;
-          }
-        } catch {
-          // fall through
-        }
-      }
-
-      setIsLoading(false);
-    })();
-  }, []);
-
-  return { location, isLoading };
-}
-
 export default function MenuBarWeather() {
-  const { location, isLoading: isLocationLoading } = useMenuBarLocation();
+  const { location, isLoading: isLocationLoading } = useDefaultLocation();
   const prefs = getPrefs();
 
   const url = useMemo(

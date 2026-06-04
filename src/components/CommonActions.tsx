@@ -17,12 +17,24 @@ export function CommonActions() {
       </ActionPanel.Section>
       <ActionPanel.Section title="About">
         <Action.OpenInBrowser
-          title="Yr.no API Docs"
+          title="Met.no Forecast Docs"
           url="https://api.met.no/weatherapi/locationforecast/2.0/documentation"
+        />
+        <Action.OpenInBrowser
+          title="Met.no Alerts Docs"
+          url="https://api.met.no/weatherapi/metalerts/2.0/documentation"
         />
         <Action.OpenInBrowser
           title="Open-Meteo Geocoding Docs"
           url="https://open-meteo.com/en/docs/geocoding-api"
+        />
+        <Action.OpenInBrowser
+          title="Open-Meteo Air Quality Docs"
+          url="https://open-meteo.com/en/docs/air-quality-api"
+        />
+        <Action.OpenInBrowser
+          title="Open-Meteo UV Docs"
+          url="https://open-meteo.com/en/docs"
         />
       </ActionPanel.Section>
     </>

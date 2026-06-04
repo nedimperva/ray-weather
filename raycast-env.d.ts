@@ -26,6 +26,8 @@ declare type Preferences = ExtensionPreferences
 declare namespace Preferences {
   /** Preferences accessible in the `search-weather` command */
   export type SearchWeather = ExtensionPreferences & {}
+  /** Preferences accessible in the `today-weather-brief` command */
+  export type TodayWeatherBrief = ExtensionPreferences & {}
   /** Preferences accessible in the `menu-bar-weather` command */
   export type MenuBarWeather = ExtensionPreferences & {}
 }
@@ -33,6 +35,8 @@ declare namespace Preferences {
 declare namespace Arguments {
   /** Arguments passed to the `search-weather` command */
   export type SearchWeather = {}
+  /** Arguments passed to the `today-weather-brief` command */
+  export type TodayWeatherBrief = {}
   /** Arguments passed to the `menu-bar-weather` command */
   export type MenuBarWeather = {}
 }

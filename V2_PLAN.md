@@ -37,6 +37,10 @@ Version 2.0 should make the extension feel less like a weather table and more li
   - Weekend Planner command
   - Upcoming Saturday/Sunday extraction
   - Better weekend day recommendation with comfort score, rain, wind, UV, and alert context
+- Completed alert workflow:
+  - Severe Weather Alerts command
+  - Default-location alert view
+  - Favorite-location alert scan with severity context
 
 ## v2.0 Milestones
 

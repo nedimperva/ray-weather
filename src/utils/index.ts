@@ -6,4 +6,5 @@ export * from "./formatting";
 export * from "./dates";
 export * from "./forecast";
 export * from "./weatherInsights";
+export * from "./alerts";
 export * from "./markdown";

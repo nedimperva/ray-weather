@@ -39,6 +39,12 @@
       "mode": "view"
     },
     {
+      "name": "severe-weather-alerts",
+      "title": "Severe Weather Alerts",
+      "description": "Check active weather alerts for the pinned location and favorites",
+      "mode": "view"
+    },
+    {
       "name": "menu-bar-weather",
       "title": "Menu Bar Weather",
       "description": "Show current weather in the menu bar for a pinned location",

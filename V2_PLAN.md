@@ -29,6 +29,10 @@ Version 2.0 should make the extension feel less like a weather table and more li
   - Shared default-location lookup for pinned location or first favorite
   - Today's Weather Brief command
   - Forecast, alert, AQI, UV, and geocoding source actions
+- Completed compare workflow:
+  - Compare Weather command
+  - Favorite-to-favorite selection flow
+  - Better-location recommendation with comfort score, rain, wind, AQI, UV, and alert context
 
 ## v2.0 Milestones
 

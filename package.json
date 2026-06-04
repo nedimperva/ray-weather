@@ -27,6 +27,12 @@
       "mode": "view"
     },
     {
+      "name": "compare-weather",
+      "title": "Compare Weather",
+      "description": "Compare two favorite locations for today's conditions",
+      "mode": "view"
+    },
+    {
       "name": "menu-bar-weather",
       "title": "Menu Bar Weather",
       "description": "Show current weather in the menu bar for a pinned location",

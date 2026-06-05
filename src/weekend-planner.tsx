@@ -33,6 +33,7 @@ import {
   dateFromDateKey,
   formatIsoTimeInTimezone,
   locationSummary,
+  parseWeatherAlerts,
 } from "./utils";
 import { formatTemperatureRange } from "./utils/temperature";
 import { formatPrecipitation, formatWindSpeed } from "./utils/units";
@@ -56,7 +57,13 @@ function weekendDaysFromForecast(days: DailyForecast[]): DailyForecast[] {
     : undefined;
 
   if (saturday && sundayAfterSaturday) return [saturday, sundayAfterSaturday];
-  return days.filter((day) => [0, 6].includes(weekdayIndex(day))).slice(0, 2);
+  const availableWeekendDays = days
+    .filter((day) => [0, 6].includes(weekdayIndex(day)))
+    .slice(0, 2);
+
+  return availableWeekendDays.length > 0
+    ? availableWeekendDays
+    : days.slice(0, 2);
 }
 
 function reasonForPick(
@@ -175,25 +182,10 @@ function WeekendPlannerView(props: { location: Location }) {
     }
   }, [data, forecastDays, location.timezone]);
 
-  const alerts: WeatherAlert[] = useMemo(() => {
-    const result: WeatherAlert[] = [];
-    const features = alertsData?.features ?? [];
-    for (const feature of features) {
-      const p = feature.properties;
-      if (p?.event) {
-        result.push({
-          area: p.area ?? "",
-          event: p.event,
-          headline: p.headline ?? "",
-          description: p.description ?? "",
-          severity:
-            (p.severity?.toLowerCase() as WeatherAlert["severity"]) ??
-            "unknown",
-        });
-      }
-    }
-    return result;
-  }, [alertsData]);
+  const alerts: WeatherAlert[] = useMemo(
+    () => parseWeatherAlerts(alertsData),
+    [alertsData],
+  );
 
   const maxUvByDate = useMemo(() => {
     const map = new Map<string, number>();
@@ -216,6 +208,9 @@ function WeekendPlannerView(props: { location: Location }) {
   const weekendDays = useMemo(
     () => weekendDaysFromForecast(dailyForecast),
     [dailyForecast],
+  );
+  const isFallbackWeekend = weekendDays.some(
+    (day) => ![0, 6].includes(weekdayIndex(day)),
   );
   const scoredWeekendDays = weekendDays.map((day) => ({
     day,
@@ -300,7 +295,7 @@ function WeekendPlannerView(props: { location: Location }) {
             />
           </List.Section>
           <List.Section
-            title="Weekend Days"
+            title={isFallbackWeekend ? "Next Available Days" : "Weekend Days"}
             subtitle={`Updated ${updatedLabel}`}
           >
             {weekendDays.map((day) => (
@@ -366,20 +361,37 @@ function WeekendPlannerView(props: { location: Location }) {
           </List.Section>
         </>
       ) : (
-        <List.EmptyView
-          title="No weekend forecast yet"
-          description="Try increasing Forecast Days to 10 or refreshing the forecast."
-          actions={
-            <ActionPanel>
-              <Action
-                title="Refresh Weekend Planner"
-                icon={Icon.ArrowClockwise}
-                onAction={revalidate}
-              />
-              <CommonActions />
-            </ActionPanel>
-          }
-        />
+        <List.Section title="Weekend Planner">
+          <List.Item
+            title={isLoading ? "Loading forecast" : "No forecast data"}
+            subtitle={
+              error
+                ? "Refresh failed. Cached data was not available for this location."
+                : `Default location: ${locationSummary(location)}`
+            }
+            icon={isLoading ? Icon.Clock : Icon.Calendar}
+            actions={
+              <ActionPanel>
+                <Action
+                  title="Refresh Weekend Planner"
+                  icon={Icon.ArrowClockwise}
+                  onAction={revalidate}
+                />
+                <Action
+                  title="Open Search Weather"
+                  icon={Icon.MagnifyingGlass}
+                  onAction={() =>
+                    void launchCommand({
+                      name: "search-weather",
+                      type: LaunchType.UserInitiated,
+                    })
+                  }
+                />
+                <CommonActions />
+              </ActionPanel>
+            }
+          />
+        </List.Section>
       )}
     </List>
   );

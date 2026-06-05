@@ -85,6 +85,7 @@ function BriefView(props: { location: Location }) {
 
   const today = dailyForecast[0];
   const currentHour = today ? getCurrentHour(today) : undefined;
+  const shouldLoadSunEvents = today?.dateKey !== undefined;
   const {
     data: sunData,
     error: sunError,
@@ -211,7 +212,7 @@ function BriefView(props: { location: Location }) {
 
   return (
     <List
-      isLoading={isLoading || isSunLoading}
+      isLoading={isLoading || (shouldLoadSunEvents && isSunLoading)}
       searchBarPlaceholder={`Weather brief for ${location.name}`}
     >
       {alerts.length > 0 && <AlertBadge alerts={alerts} />}
@@ -420,10 +421,37 @@ function BriefView(props: { location: Location }) {
           </List.Section>
         </>
       ) : (
-        <List.EmptyView
-          title="No brief yet"
-          description="Try refreshing the default location forecast."
-        />
+        <List.Section title="Weather Brief">
+          <List.Item
+            title={isLoading ? "Loading forecast" : "No forecast data"}
+            subtitle={
+              error
+                ? "Refresh failed. Cached data was not available for this location."
+                : `Default location: ${locationSummary(location)}`
+            }
+            icon={isLoading ? Icon.Clock : Icon.Cloud}
+            actions={
+              <ActionPanel>
+                <Action
+                  title="Refresh Brief"
+                  icon={Icon.ArrowClockwise}
+                  onAction={revalidate}
+                />
+                <Action
+                  title="Open Search Weather"
+                  icon={Icon.MagnifyingGlass}
+                  onAction={() =>
+                    void launchCommand({
+                      name: "search-weather",
+                      type: LaunchType.UserInitiated,
+                    })
+                  }
+                />
+                <CommonActions />
+              </ActionPanel>
+            }
+          />
+        </List.Section>
       )}
     </List>
   );

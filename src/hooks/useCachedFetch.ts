@@ -5,6 +5,7 @@ import { APP_USER_AGENT } from "../constants";
 
 interface FetchOptions {
   headers?: Record<string, string>;
+  execute?: boolean;
 }
 
 type CachedPayload<T> = {
@@ -19,7 +20,9 @@ function cacheKeyForUrl(url: string): string {
 export function useCachedFetch<T>(url: string, options?: FetchOptions) {
   const cacheKey = useMemo(() => cacheKeyForUrl(url), [url]);
   const [cachedPayload, setCachedPayload] = useState<CachedPayload<T>>();
+  const shouldExecute = options?.execute ?? true;
   const result = useFetch<T>(url, {
+    execute: shouldExecute,
     keepPreviousData: true,
     headers: {
       "User-Agent": APP_USER_AGENT,
@@ -34,6 +37,11 @@ export function useCachedFetch<T>(url: string, options?: FetchOptions) {
   });
 
   useEffect(() => {
+    if (!shouldExecute) {
+      setCachedPayload(undefined);
+      return;
+    }
+
     let isMounted = true;
     setCachedPayload(undefined);
 
@@ -51,9 +59,10 @@ export function useCachedFetch<T>(url: string, options?: FetchOptions) {
     return () => {
       isMounted = false;
     };
-  }, [cacheKey]);
+  }, [cacheKey, shouldExecute]);
 
   useEffect(() => {
+    if (!shouldExecute) return;
     if (result.data === undefined) return;
 
     const payload: CachedPayload<T> = {
@@ -62,7 +71,7 @@ export function useCachedFetch<T>(url: string, options?: FetchOptions) {
     };
     setCachedPayload(payload);
     void LocalStorage.setItem(cacheKey, JSON.stringify(payload));
-  }, [cacheKey, result.data]);
+  }, [cacheKey, result.data, shouldExecute]);
 
   const shouldUseFallback =
     result.data === undefined && cachedPayload !== undefined;

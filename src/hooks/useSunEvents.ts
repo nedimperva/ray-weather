@@ -10,5 +10,5 @@ export function useSunEvents(location: Location, dateKey: string) {
     [location.latitude, location.longitude, dateKey],
   );
 
-  return useCachedFetch<MetNoSunResponse>(url);
+  return useCachedFetch<MetNoSunResponse>(url, { execute: dateKey.length > 0 });
 }

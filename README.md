@@ -1,4 +1,4 @@
-# YR.NO Weather for Raycast
+# Forecast Pilot for Raycast
 
 A Raycast extension for Windows that turns met.no and Open-Meteo weather data into fast, decision-first workflows.
 
@@ -426,7 +426,7 @@ Update this constant before publishing or distributing widely:
 
 ```ts
 export const APP_USER_AGENT =
-  "yr-no-raycast-extension/1.1 (https://github.com/your-org/yr.no-ray)";
+  "forecast-pilot-raycast-extension/1.1 (https://github.com/nedimperva/ray-weather)";
 ```
 
 The constant is defined in:

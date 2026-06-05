@@ -1,8 +1,8 @@
 {
   "$schema": "https://www.raycast.com/schemas/extension.json",
-  "name": "yr-no-weather",
-  "title": "YR.NO Weather",
-  "description": "Quickly check yr.no weather for today and upcoming days by place name.",
+  "name": "forecast-pilot",
+  "title": "Forecast Pilot",
+  "description": "Decision-first weather planning for forecasts, alerts, commutes, trips, and outdoor comfort.",
   "icon": "icon.png",
   "author": "nedim_perva",
   "categories": [
@@ -17,7 +17,7 @@
     {
       "name": "search-weather",
       "title": "Search Weather",
-      "description": "Check yr.no forecast for today and next days",
+      "description": "Search locations and open a decision-first forecast",
       "mode": "view"
     },
     {

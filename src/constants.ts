@@ -17,4 +17,4 @@ export const MAX_HISTORY_ITEMS = 10;
 export const MAX_FAVORITES = 20;
 
 export const APP_USER_AGENT =
-  "yr-no-raycast-extension/1.1 (https://github.com/your-org/yr.no-ray)";
+  "forecast-pilot-raycast-extension/1.1 (https://github.com/nedimperva/ray-weather)";

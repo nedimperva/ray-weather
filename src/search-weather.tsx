@@ -17,7 +17,10 @@ import {
   useSearchHistory,
   usePlaceSearch,
 } from "./hooks";
-import { formatLocationSubtitle } from "./utils/formatting";
+import {
+  displayLocationName,
+  formatLocationSubtitle,
+} from "./utils/formatting";
 import { ForecastView } from "./components";
 import { CommonActions } from "./components";
 
@@ -64,7 +67,7 @@ export default function Command() {
       <List.Item
         key={place.id}
         icon={{ source: Icon.Pin, tintColor: Color.Orange }}
-        title={place.name}
+        title={displayLocationName(place)}
         subtitle={formatLocationSubtitle(place)}
         accessories={[
           {

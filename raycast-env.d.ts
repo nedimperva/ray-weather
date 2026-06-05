@@ -36,6 +36,8 @@ declare namespace Preferences {
   export type SearchWeather = ExtensionPreferences & {}
   /** Preferences accessible in the `today-weather-brief` command */
   export type TodayWeatherBrief = ExtensionPreferences & {}
+  /** Preferences accessible in the `manage-favorites` command */
+  export type ManageFavorites = ExtensionPreferences & {}
   /** Preferences accessible in the `compare-weather` command */
   export type CompareWeather = ExtensionPreferences & {}
   /** Preferences accessible in the `weekend-planner` command */
@@ -44,6 +46,10 @@ declare namespace Preferences {
   export type CommuteForecast = ExtensionPreferences & {}
   /** Preferences accessible in the `comfort-ranking` command */
   export type ComfortRanking = ExtensionPreferences & {}
+  /** Preferences accessible in the `travel-packing-forecast` command */
+  export type TravelPackingForecast = ExtensionPreferences & {}
+  /** Preferences accessible in the `share-forecast` command */
+  export type ShareForecast = ExtensionPreferences & {}
   /** Preferences accessible in the `severe-weather-alerts` command */
   export type SevereWeatherAlerts = ExtensionPreferences & {}
   /** Preferences accessible in the `menu-bar-weather` command */
@@ -55,6 +61,8 @@ declare namespace Arguments {
   export type SearchWeather = {}
   /** Arguments passed to the `today-weather-brief` command */
   export type TodayWeatherBrief = {}
+  /** Arguments passed to the `manage-favorites` command */
+  export type ManageFavorites = {}
   /** Arguments passed to the `compare-weather` command */
   export type CompareWeather = {}
   /** Arguments passed to the `weekend-planner` command */
@@ -63,6 +71,10 @@ declare namespace Arguments {
   export type CommuteForecast = {}
   /** Arguments passed to the `comfort-ranking` command */
   export type ComfortRanking = {}
+  /** Arguments passed to the `travel-packing-forecast` command */
+  export type TravelPackingForecast = {}
+  /** Arguments passed to the `share-forecast` command */
+  export type ShareForecast = {}
   /** Arguments passed to the `severe-weather-alerts` command */
   export type SevereWeatherAlerts = {}
   /** Arguments passed to the `menu-bar-weather` command */

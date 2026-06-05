@@ -16,6 +16,12 @@ export type ShouldIDecision = {
   color: Color;
 };
 
+export type PackingSuggestion = {
+  item: string;
+  reason: string;
+  color: Color;
+};
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -250,6 +256,118 @@ export function buildComfortScore(
   score -= Math.max((day.avgFogCoveragePct ?? 0) - 30, 0) / 2;
 
   return Math.round(clamp(score, 0, 100));
+}
+
+export function buildPackingSuggestions(
+  days: DailyForecast[],
+  maxUvByDate = new Map<string, number>(),
+  aqi?: number,
+  alertCount = 0,
+): PackingSuggestion[] {
+  const suggestions: PackingSuggestion[] = [];
+  const totalRain = days.reduce((total, day) => total + day.precipitationMm, 0);
+  const maxRain = Math.max(0, ...days.map((day) => day.precipitationMm));
+  const minFeelsLike = Math.min(
+    ...days.map((day) => day.minFeelsLikeC),
+    Number.POSITIVE_INFINITY,
+  );
+  const maxTemp = Math.max(...days.map((day) => day.maxTempC), 0);
+  const maxWind = Math.max(...days.map((day) => day.avgWindSpeedMs ?? 0), 0);
+  const maxUv = Math.max(
+    ...days.map((day) => maxUvByDate.get(day.dateKey) ?? 0),
+    0,
+  );
+  const foggyDays = days.filter((day) => (day.avgFogCoveragePct ?? 0) >= 30);
+
+  if (totalRain >= 2 || maxRain >= 1) {
+    suggestions.push({
+      item: "Umbrella",
+      reason: `${totalRain.toFixed(1)} mm rain across the forecast`,
+      color: Color.Blue,
+    });
+    suggestions.push({
+      item: "Waterproof layer",
+      reason: "rain is likely enough to plan for",
+      color: Color.Blue,
+    });
+  }
+
+  if (minFeelsLike <= 5) {
+    suggestions.push({
+      item: "Warm jacket",
+      reason: `feels like ${minFeelsLike.toFixed(0)} deg C at the low point`,
+      color: Color.Blue,
+    });
+  } else if (minFeelsLike <= 12) {
+    suggestions.push({
+      item: "Light layers",
+      reason: "cooler mornings or evenings are possible",
+      color: Color.Green,
+    });
+  }
+
+  if (maxTemp >= 28) {
+    suggestions.push({
+      item: "Light clothing",
+      reason: `highs may reach ${maxTemp.toFixed(0)} deg C`,
+      color: Color.Orange,
+    });
+  }
+
+  if (maxUv >= 6) {
+    suggestions.push({
+      item: "Sunscreen",
+      reason: `UV may reach ${maxUv.toFixed(0)}`,
+      color: Color.Orange,
+    });
+    suggestions.push({
+      item: "Sunglasses",
+      reason: "sun exposure may be strong",
+      color: Color.Yellow,
+    });
+  }
+
+  if (maxWind >= 8) {
+    suggestions.push({
+      item: "Windproof layer",
+      reason: `wind may reach ${maxWind.toFixed(1)} m/s`,
+      color: Color.Orange,
+    });
+  }
+
+  if ((aqi ?? 0) > 100) {
+    suggestions.push({
+      item: "Air quality backup plan",
+      reason: `AQI may be unhealthy for sensitive groups`,
+      color: Color.Red,
+    });
+  }
+
+  if (alertCount > 0) {
+    suggestions.push({
+      item: "Weather alert plan",
+      reason: `${alertCount} active alert${alertCount === 1 ? "" : "s"}`,
+      color: Color.Red,
+    });
+  }
+
+  if (foggyDays.length > 0) {
+    suggestions.push({
+      item: "Extra travel time",
+      reason: "fog coverage is elevated on at least one day",
+      color: Color.SecondaryText,
+    });
+  }
+
+  if (suggestions.length === 0) {
+    suggestions.push({
+      item: "Normal day bag",
+      reason: "conditions look fairly settled",
+      color: Color.Green,
+    });
+  }
+
+  return suggestions;
 }
 
 export function buildPersonalitySummary(

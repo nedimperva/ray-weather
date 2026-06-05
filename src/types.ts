@@ -16,6 +16,8 @@ export type GeocodeApiResponse = {
 export type Location = {
   id: string;
   name: string;
+  nickname?: string;
+  group?: string;
   latitude: number;
   longitude: number;
   country?: string;

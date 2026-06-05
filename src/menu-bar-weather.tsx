@@ -13,7 +13,10 @@ import { useDefaultLocation } from "./hooks";
 import { getPrefs } from "./preferences";
 import { calculateFeelsLikeC, formatTemperature } from "./utils/temperature";
 import { formatWindSpeed, formatPrecipitation } from "./utils/units";
-import { conditionLabelForSymbol } from "./utils/formatting";
+import {
+  conditionLabelForSymbol,
+  displayLocationName,
+} from "./utils/formatting";
 import { ensureValidTimeZone, formatIsoTimeInTimezone } from "./utils/dates";
 
 export default function MenuBarWeather() {
@@ -144,7 +147,7 @@ export default function MenuBarWeather() {
               prefs.temperatureUnit,
             )}`;
           case "location-temp":
-            return `${location.name} ${temperature}`;
+            return `${displayLocationName(location)} ${temperature}`;
           case "compact":
             return undefined;
           case "temp-condition":
@@ -165,9 +168,9 @@ export default function MenuBarWeather() {
       icon={Icon.Cloud}
       title={title}
       isLoading={isLoading}
-      tooltip={`Weather for ${location.name}`}
+      tooltip={`Weather for ${displayLocationName(location)}`}
     >
-      <MenuBarExtra.Section title={location.name}>
+      <MenuBarExtra.Section title={displayLocationName(location)}>
         {current && (
           <>
             <MenuBarExtra.Item

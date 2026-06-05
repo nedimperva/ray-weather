@@ -27,6 +27,12 @@
       "mode": "view"
     },
     {
+      "name": "manage-favorites",
+      "title": "Manage Favorites",
+      "description": "Edit favorite nicknames, groups, order, and pinned location",
+      "mode": "view"
+    },
+    {
       "name": "compare-weather",
       "title": "Compare Weather",
       "description": "Compare two favorite locations for today's conditions",
@@ -48,6 +54,18 @@
       "name": "comfort-ranking",
       "title": "Comfort Ranking",
       "description": "Rank upcoming days by outdoor comfort for the default location",
+      "mode": "view"
+    },
+    {
+      "name": "travel-packing-forecast",
+      "title": "Travel Packing Forecast",
+      "description": "Suggest what to pack from the upcoming forecast",
+      "mode": "view"
+    },
+    {
+      "name": "share-forecast",
+      "title": "Share Forecast",
+      "description": "Copy Markdown and compact forecast summaries",
       "mode": "view"
     },
     {

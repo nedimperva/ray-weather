@@ -75,6 +75,27 @@ export function useFavoriteLocations() {
     });
   }, [setFavorites]);
 
+  const updateFavoriteMetadata = useCallback(
+    (locationId: string, metadata: Pick<Location, "nickname" | "group">) => {
+      setFavorites(
+        favorites.map((favorite) =>
+          favorite.id === locationId
+            ? {
+                ...favorite,
+                nickname: metadata.nickname?.trim() || undefined,
+                group: metadata.group?.trim() || undefined,
+              }
+            : favorite,
+        ),
+      );
+      void showToast({
+        style: Toast.Style.Success,
+        title: "Favorite updated",
+      });
+    },
+    [favorites, setFavorites],
+  );
+
   const isFavorite = useCallback(
     (locationId: string) => {
       return favorites.some((f) => f.id === locationId);
@@ -89,6 +110,7 @@ export function useFavoriteLocations() {
     moveFavorite,
     moveFavoriteToTop,
     clearFavorites,
+    updateFavoriteMetadata,
     isFavorite,
   };
 }

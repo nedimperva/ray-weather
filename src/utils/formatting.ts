@@ -24,9 +24,14 @@ export function formatLocationSubtitle(location: Location): string {
   return [location.region, location.country].filter(Boolean).join(", ");
 }
 
+export function displayLocationName(location: Location): string {
+  return location.nickname?.trim() || location.name;
+}
+
 export function locationSummary(location: Location): string {
   const subtitle = formatLocationSubtitle(location);
-  return subtitle ? `${location.name}, ${subtitle}` : location.name;
+  const name = displayLocationName(location);
+  return subtitle ? `${name}, ${subtitle}` : name;
 }
 
 export function dayLabelFromIndex(dayIndex: number, weekday: string): string {

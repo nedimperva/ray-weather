@@ -42,6 +42,8 @@ declare namespace Preferences {
   export type WeekendPlanner = ExtensionPreferences & {}
   /** Preferences accessible in the `commute-forecast` command */
   export type CommuteForecast = ExtensionPreferences & {}
+  /** Preferences accessible in the `comfort-ranking` command */
+  export type ComfortRanking = ExtensionPreferences & {}
   /** Preferences accessible in the `severe-weather-alerts` command */
   export type SevereWeatherAlerts = ExtensionPreferences & {}
   /** Preferences accessible in the `menu-bar-weather` command */
@@ -59,6 +61,8 @@ declare namespace Arguments {
   export type WeekendPlanner = {}
   /** Arguments passed to the `commute-forecast` command */
   export type CommuteForecast = {}
+  /** Arguments passed to the `comfort-ranking` command */
+  export type ComfortRanking = {}
   /** Arguments passed to the `severe-weather-alerts` command */
   export type SevereWeatherAlerts = {}
   /** Arguments passed to the `menu-bar-weather` command */

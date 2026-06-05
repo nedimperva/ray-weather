@@ -45,6 +45,10 @@ Version 2.0 should make the extension feel less like a weather table and more li
   - Commute Forecast command
   - Configurable morning/evening commute windows
   - "Should I..." actions for umbrella, jacket, walking, and driving
+- Completed ranking and freshness workflow:
+  - Comfort Ranking command
+  - Cached fallback state from the shared fetch hook
+  - AQI and UV freshness timestamps in forecast surfaces
 
 ## v2.0 Milestones
 

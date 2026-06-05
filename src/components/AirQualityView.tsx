@@ -1,4 +1,4 @@
-import { ActionPanel, Icon, List } from "@raycast/api";
+import { Action, ActionPanel, Icon, List } from "@raycast/api";
 import { showFailureToast } from "@raycast/utils";
 import { useEffect } from "react";
 import type { Location } from "../types";
@@ -6,11 +6,19 @@ import { useAirQuality } from "../hooks";
 import { colorForAqi } from "../utils/colors";
 import { iconForAqi } from "../utils/icons";
 import { aqiLabel } from "../utils/formatting";
+import { formatIsoTimeInTimezone, formatUnixTimeInTimezone } from "../utils";
 import { CommonActions } from "./CommonActions";
 
 export function AirQualityView(props: { location: Location }) {
   const { location } = props;
-  const { data, error, isLoading } = useAirQuality(location);
+  const {
+    data,
+    error,
+    isLoading,
+    isUsingFallback,
+    cacheUpdatedAt,
+    revalidate,
+  } = useAirQuality(location);
 
   useEffect(() => {
     if (error) {
@@ -30,6 +38,7 @@ export function AirQualityView(props: { location: Location }) {
   const o3 = getCurrentValue(hourly?.ozone);
   const no2 = getCurrentValue(hourly?.nitrogen_dioxide);
   const co = getCurrentValue(hourly?.carbon_monoxide);
+  const updatedAt = getCurrentValue(hourly?.time);
   const microgramUnit = "µg/m³";
 
   return (
@@ -38,6 +47,33 @@ export function AirQualityView(props: { location: Location }) {
       searchBarPlaceholder={`Air Quality for ${location.name}`}
     >
       <List.Section title="Air Quality Index">
+        <List.Item
+          title={
+            isUsingFallback ? "Using cached air quality" : "Data freshness"
+          }
+          subtitle={
+            isUsingFallback
+              ? `Last successful fetch ${formatIsoTimeInTimezone(
+                  cacheUpdatedAt,
+                  location.timezone,
+                )}`
+              : `AQI sample ${formatUnixTimeInTimezone(
+                  updatedAt,
+                  location.timezone,
+                )}`
+          }
+          icon={Icon.Clock}
+          actions={
+            <ActionPanel>
+              <Action
+                title="Refresh Air Quality"
+                icon={Icon.ArrowClockwise}
+                onAction={revalidate}
+              />
+              <CommonActions />
+            </ActionPanel>
+          }
+        />
         <List.Item
           title="AQI"
           subtitle={aqi !== undefined ? `${aqi} - ${aqiLabel(aqi)}` : "No data"}

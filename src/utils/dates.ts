@@ -44,6 +44,34 @@ export function formatIsoTimeInTimezone(
   }).format(new Date(isoTime));
 }
 
+export function formatUnixTimeInTimezone(
+  unixTime: number | undefined,
+  timeZone: string,
+): string {
+  if (unixTime === undefined) return "No data";
+
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: ensureValidTimeZone(timeZone),
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(unixTime * 1000));
+}
+
+export function formatLocalDateTimeInTimezone(
+  localDateTime: string | undefined,
+  timeZone: string,
+): string {
+  if (!localDateTime) return "No data";
+
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: ensureValidTimeZone(timeZone),
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(localDateTime));
+}
+
 export function dateFromDateKey(dateKey: string): Date {
   const [year, month, day] = dateKey.split("-").map((value) => Number(value));
   if (!year || !month || !day) return new Date();

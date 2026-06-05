@@ -34,6 +34,8 @@ import {
   buildDecisionTags,
   buildPersonalitySummary,
   formatIsoTimeInTimezone,
+  formatLocalDateTimeInTimezone,
+  formatUnixTimeInTimezone,
   getCurrentHour,
   locationSummary,
   parseWeatherAlerts,
@@ -46,10 +48,27 @@ function BriefView(props: { location: Location }) {
   const { location } = props;
   const prefs = getPrefs();
   const forecastDays = getForecastDays();
-  const { data, error, isLoading, revalidate } = useForecast(location);
+  const {
+    data,
+    error,
+    isLoading,
+    isUsingFallback,
+    cacheUpdatedAt,
+    revalidate,
+  } = useForecast(location);
   const { data: alertsData } = useWeatherAlerts(location);
-  const { data: airQualityData } = useAirQuality(location);
-  const { data: uvData } = useUVIndex(location, forecastDays);
+  const {
+    data: airQualityData,
+    isUsingFallback: isAqiUsingFallback,
+    cacheUpdatedAt: aqiCacheUpdatedAt,
+    revalidate: revalidateAqi,
+  } = useAirQuality(location);
+  const {
+    data: uvData,
+    isUsingFallback: isUvUsingFallback,
+    cacheUpdatedAt: uvCacheUpdatedAt,
+    revalidate: revalidateUv,
+  } = useUVIndex(location, forecastDays);
 
   const dailyForecast = useMemo(() => {
     try {
@@ -93,6 +112,12 @@ function BriefView(props: { location: Location }) {
     const values = airQualityData?.hourly?.us_aqi ?? [];
     return values.find((value) => value !== undefined);
   }, [airQualityData]);
+  const currentAqiUpdatedAt = useMemo(() => {
+    const values = airQualityData?.hourly?.us_aqi ?? [];
+    const times = airQualityData?.hourly?.time ?? [];
+    const index = values.findIndex((value) => value !== undefined);
+    return index >= 0 ? times[index] : undefined;
+  }, [airQualityData]);
 
   const uvByDateHour = useMemo(() => {
     const map = new Map<string, number>();
@@ -114,6 +139,14 @@ function BriefView(props: { location: Location }) {
     today && currentHour
       ? uvByDateHour.get(`${today.dateKey}-${currentHour.hour}`)
       : undefined;
+  const currentUvUpdatedAt =
+    today && currentHour
+      ? uvData?.hourly?.time?.find((time) => {
+          if (!time) return false;
+          const hour = parseInt(time.slice(11, 13), 10);
+          return time.startsWith(today.dateKey) && hour === currentHour.hour;
+        })
+      : undefined;
   const comfortScore = today
     ? buildComfortScore(today, currentUv, currentAqi, alerts.length)
     : undefined;
@@ -132,6 +165,27 @@ function BriefView(props: { location: Location }) {
     data?.properties?.meta?.updated_at,
     location.timezone,
   );
+  const forecastFreshnessLabel = isUsingFallback
+    ? `Cached fetch ${formatIsoTimeInTimezone(cacheUpdatedAt, location.timezone)}`
+    : `Forecast ${updatedLabel}`;
+  const aqiFreshnessLabel = isAqiUsingFallback
+    ? `Cached fetch ${formatIsoTimeInTimezone(
+        aqiCacheUpdatedAt,
+        location.timezone,
+      )}`
+    : `AQI sample ${formatUnixTimeInTimezone(
+        currentAqiUpdatedAt,
+        location.timezone,
+      )}`;
+  const uvFreshnessLabel = isUvUsingFallback
+    ? `Cached fetch ${formatIsoTimeInTimezone(
+        uvCacheUpdatedAt,
+        location.timezone,
+      )}`
+    : `UV sample ${formatLocalDateTimeInTimezone(
+        currentUvUpdatedAt,
+        location.timezone,
+      )}`;
   const sunriseLabel = formatIsoTimeInTimezone(
     sunData?.properties?.sunrise?.time,
     location.timezone,
@@ -303,6 +357,53 @@ function BriefView(props: { location: Location }) {
               title="Sunrise / Sunset"
               subtitle={`${sunriseLabel} / ${sunsetLabel}`}
               icon={Icon.Sun}
+            />
+          </List.Section>
+          <List.Section title="Freshness">
+            <List.Item
+              title="Forecast"
+              subtitle={forecastFreshnessLabel}
+              icon={Icon.Clock}
+              actions={
+                <ActionPanel>
+                  <Action
+                    title="Refresh Brief"
+                    icon={Icon.ArrowClockwise}
+                    onAction={revalidate}
+                  />
+                  <CommonActions />
+                </ActionPanel>
+              }
+            />
+            <List.Item
+              title="Air Quality"
+              subtitle={aqiFreshnessLabel}
+              icon={Icon.Wind}
+              actions={
+                <ActionPanel>
+                  <Action
+                    title="Refresh Air Quality"
+                    icon={Icon.ArrowClockwise}
+                    onAction={revalidateAqi}
+                  />
+                  <CommonActions />
+                </ActionPanel>
+              }
+            />
+            <List.Item
+              title="UV"
+              subtitle={uvFreshnessLabel}
+              icon={Icon.Sun}
+              actions={
+                <ActionPanel>
+                  <Action
+                    title="Refresh UV"
+                    icon={Icon.ArrowClockwise}
+                    onAction={revalidateUv}
+                  />
+                  <CommonActions />
+                </ActionPanel>
+              }
             />
           </List.Section>
           <List.Section title="Sources">

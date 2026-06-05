@@ -45,6 +45,12 @@
       "mode": "view"
     },
     {
+      "name": "comfort-ranking",
+      "title": "Comfort Ranking",
+      "description": "Rank upcoming days by outdoor comfort for the default location",
+      "mode": "view"
+    },
+    {
       "name": "severe-weather-alerts",
       "title": "Severe Weather Alerts",
       "description": "Check active weather alerts for the pinned location and favorites",

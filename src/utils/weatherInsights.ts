@@ -148,7 +148,7 @@ export function buildShouldIDecisions(
           answer: "Yes",
           reason:
             morningLow <= 8
-              ? `feels like ${morningLow.toFixed(0)}°C in the morning`
+              ? `feels like ${morningLow.toFixed(0)} deg C in the morning`
               : maxWind >= 8
                 ? "wind will make it feel cooler"
                 : "the day stays cool",

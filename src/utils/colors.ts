@@ -36,3 +36,17 @@ export function colorForAqi(aqi: number): Color {
   if (aqi <= 150) return Color.Orange;
   return Color.Red;
 }
+
+export function colorForProbability(probabilityPct: number): Color {
+  if (probabilityPct < 20) return Color.SecondaryText;
+  if (probabilityPct < 50) return Color.Blue;
+  if (probabilityPct < 80) return Color.Orange;
+  return Color.Red;
+}
+
+export function comfortColor(score: number | undefined): Color {
+  if (score === undefined) return Color.SecondaryText;
+  if (score >= 75) return Color.Green;
+  if (score >= 50) return Color.Yellow;
+  return Color.Red;
+}

@@ -2,10 +2,14 @@ import { ActionPanel, Icon, List } from "@raycast/api";
 import { showFailureToast } from "@raycast/utils";
 import { useEffect } from "react";
 import type { Location, DailyForecast, WeatherAlert } from "../types";
-import { getPrefs, getForecastDays } from "../preferences";
-import { useSunEvents, useUVIndex } from "../hooks";
+import { getPrefs } from "../preferences";
+import { useSunEvents } from "../hooks";
 import { iconForSymbol } from "../utils/icons";
-import { colorForTemperature, colorForUV } from "../utils/colors";
+import {
+  colorForProbability,
+  colorForTemperature,
+  colorForUV,
+} from "../utils/colors";
 import {
   formatTemperature,
   formatTemperatureRange,
@@ -33,9 +37,6 @@ export function DayDetailsView(props: {
     isLoading: isSunLoading,
   } = useSunEvents(location, day.dateKey);
 
-  const forecastDays = getForecastDays();
-  const { data: uvData } = useUVIndex(location, forecastDays);
-
   useEffect(() => {
     if (sunError) {
       void showFailureToast(sunError, { title: "Failed to load sun events" });
@@ -50,21 +51,6 @@ export function DayDetailsView(props: {
     sunData?.properties?.sunset?.time,
     location.timezone,
   );
-
-  const uvByHour = new Map<string, number>();
-  if (uvData?.hourly?.time && uvData?.hourly?.uv_index) {
-    for (let i = 0; i < uvData.hourly.time.length; i++) {
-      const time = uvData.hourly.time[i];
-      const uv = uvData.hourly.uv_index[i];
-      if (time && uv !== undefined) {
-        const dateKey = time.slice(0, 10);
-        if (dateKey === day.dateKey) {
-          const hour = parseInt(time.slice(11, 13), 10);
-          uvByHour.set(hour.toString(), uv);
-        }
-      }
-    }
-  }
 
   const hourlyGroups = groupHourlyByPeriod(day.hourly);
   const pressureTrendLabel =
@@ -219,7 +205,7 @@ export function DayDetailsView(props: {
         hours.length > 0 ? (
           <List.Section key={period} title={period}>
             {hours.map((hour) => {
-              const uvIndex = uvByHour.get(hour.hour.toString());
+              const uvIndex = hour.uvIndex;
               const windDirection = formatWindDirection(hour.windDirectionDeg);
               return (
                 <List.Item
@@ -243,6 +229,20 @@ export function DayDetailsView(props: {
                         prefs.precipitationUnit,
                       ),
                     },
+                    ...(hour.precipitationProbabilityPct !== undefined
+                      ? [
+                          {
+                            tag: {
+                              value: `${Math.round(
+                                hour.precipitationProbabilityPct,
+                              )}%`,
+                              color: colorForProbability(
+                                hour.precipitationProbabilityPct,
+                              ),
+                            },
+                          },
+                        ]
+                      : []),
                     {
                       text: [
                         formatWindSpeed(hour.windSpeedMs, prefs.windSpeedUnit),
@@ -267,7 +267,7 @@ export function DayDetailsView(props: {
                           ? `${Math.round(hour.humidityPct)}%`
                           : "-",
                     },
-                    ...(uvIndex !== undefined && uvIndex > 0
+                    ...(uvIndex !== undefined && uvIndex >= 0.5
                       ? [
                           {
                             tag: {

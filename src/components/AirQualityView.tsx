@@ -6,7 +6,10 @@ import { useAirQuality } from "../hooks";
 import { colorForAqi } from "../utils/colors";
 import { iconForAqi } from "../utils/icons";
 import { aqiLabel } from "../utils/formatting";
-import { formatIsoTimeInTimezone, formatUnixTimeInTimezone } from "../utils";
+import {
+  formatIsoTimeInTimezone,
+  formatLocalDateTimeInTimezone,
+} from "../utils";
 import { CommonActions } from "./CommonActions";
 
 export function AirQualityView(props: { location: Location }) {
@@ -57,7 +60,7 @@ export function AirQualityView(props: { location: Location }) {
                   cacheUpdatedAt,
                   location.timezone,
                 )}`
-              : `AQI sample ${formatUnixTimeInTimezone(
+              : `AQI sample ${formatLocalDateTimeInTimezone(
                   updatedAt,
                   location.timezone,
                 )}`

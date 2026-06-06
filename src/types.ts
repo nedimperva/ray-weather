@@ -25,6 +25,16 @@ export type Location = {
   timezone: string;
 };
 
+type ForecastWindow = {
+  summary?: {
+    symbol_code?: string;
+  };
+  details?: {
+    precipitation_amount?: number;
+    probability_of_precipitation?: number;
+  };
+};
+
 export type ForecastEntry = {
   time: string;
   data: {
@@ -38,32 +48,14 @@ export type ForecastEntry = {
         fog_liquid_water_content?: number;
         wind_from_direction?: number;
         wind_speed_of_gust?: number;
+        cloud_area_fraction?: number;
+        dew_point_temperature?: number;
+        ultraviolet_index_clear_sky?: number;
       };
     };
-    next_1_hours?: {
-      summary?: {
-        symbol_code?: string;
-      };
-      details?: {
-        precipitation_amount?: number;
-      };
-    };
-    next_6_hours?: {
-      summary?: {
-        symbol_code?: string;
-      };
-      details?: {
-        precipitation_amount?: number;
-      };
-    };
-    next_12_hours?: {
-      summary?: {
-        symbol_code?: string;
-      };
-      details?: {
-        precipitation_amount?: number;
-      };
-    };
+    next_1_hours?: ForecastWindow;
+    next_6_hours?: ForecastWindow;
+    next_12_hours?: ForecastWindow;
   };
 };
 
@@ -84,24 +76,6 @@ export type MetNoSunResponse = {
     sunset?: {
       time?: string;
     };
-  };
-};
-
-export type MetNoAlertsResponse = {
-  productDefinition?: {
-    alert?: MetNoAlert[];
-  }[];
-};
-
-export type MetNoAlert = {
-  area?: {
-    areaDesc?: string;
-  };
-  info?: {
-    event?: string;
-    headline?: string;
-    description?: string;
-    severity?: string;
   };
 };
 
@@ -127,6 +101,7 @@ export type DailyForecast = {
   pressureTrend?: "rising" | "falling" | "stable";
   avgFogCoveragePct?: number;
   maxUvIndex?: number;
+  maxPrecipitationProbabilityPct?: number;
   rainWindowSummary?: string;
   decisionTags?: string[];
   comfortScore?: number;
@@ -141,6 +116,7 @@ export type HourlyForecast = {
   hour: number;
   temperatureC: number;
   precipitationMm: number;
+  precipitationProbabilityPct?: number;
   precipitationWindowHours: 1 | 6 | 12;
   windSpeedMs?: number;
   windDirectionDeg?: number;
@@ -151,33 +127,9 @@ export type HourlyForecast = {
   symbolCode: string;
   condition: string;
   fogCoveragePct?: number;
+  cloudCoveragePct?: number;
+  dewPointC?: number;
   uvIndex?: number;
-};
-
-export type SymbolCandidate = {
-  symbol: string;
-  hour: number;
-};
-
-export type DailyAccumulator = {
-  minTempC: number;
-  maxTempC: number;
-  minFeelsLikeC: number;
-  maxFeelsLikeC: number;
-  precipitationMm: number;
-  symbolCandidates: SymbolCandidate[];
-  windSpeedTotal: number;
-  windSpeedCount: number;
-  humidityTotal: number;
-  humidityCount: number;
-  pressureTotal: number;
-  pressureCount: number;
-  fogCoverageTotal: number;
-  fogCoverageCount: number;
-  uvIndexTotal: number;
-  uvIndexCount: number;
-  hourly: HourlyForecast[];
-  pressures: number[];
 };
 
 export type AirQualityData = {
@@ -195,4 +147,6 @@ export type WeatherAlert = {
   headline: string;
   description: string;
   severity: "extreme" | "severe" | "moderate" | "minor" | "unknown";
+  onsetISO?: string;
+  expiresISO?: string;
 };

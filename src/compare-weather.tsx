@@ -1,17 +1,10 @@
 import { Action, ActionPanel, Color, Icon, List } from "@raycast/api";
 import { showFailureToast } from "@raycast/utils";
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import type { DailyForecast, Location, WeatherAlert } from "./types";
-import {
-  useAirQuality,
-  useFavoriteLocations,
-  useForecast,
-  useUVIndex,
-  useWeatherAlerts,
-} from "./hooks";
-import { getForecastDays, getPrefs } from "./preferences";
+import { useFavoriteLocations, useWeatherData } from "./hooks";
+import { getPrefs } from "./preferences";
 import { CommonActions } from "./components";
-import { buildDailyForecast } from "./utils/forecast";
 import { iconForSymbol } from "./utils/icons";
 import {
   colorForAqi,
@@ -19,6 +12,7 @@ import {
   colorForTemperature,
   colorForUV,
   colorForWind,
+  comfortColor,
 } from "./utils/colors";
 import {
   buildComfortScore,
@@ -38,6 +32,7 @@ type ComparisonData = {
   maxUvIndex?: number;
   currentAqi?: number;
   alerts: WeatherAlert[];
+  alertCount: number;
   comfortScore?: number;
   isLoading: boolean;
   updatedLabel: string;
@@ -45,89 +40,33 @@ type ComparisonData = {
 };
 
 function useComparisonData(location: Location): ComparisonData {
-  const forecastDays = getForecastDays();
   const {
-    data: forecastData,
-    error: forecastError,
-    isLoading: isForecastLoading,
-  } = useForecast(location);
-  const { data: alertsData, isLoading: isAlertsLoading } =
-    useWeatherAlerts(location);
-  const { data: uvData, isLoading: isUvLoading } = useUVIndex(
-    location,
-    forecastDays,
-  );
-  const { data: airQualityData, isLoading: isAirQualityLoading } =
-    useAirQuality(location);
+    today,
+    alerts,
+    alertCountForDate,
+    aqiForDate,
+    error,
+    isLoading,
+    forecastUpdatedAt,
+  } = useWeatherData(location);
 
   useEffect(() => {
-    if (forecastError) {
-      void showFailureToast(forecastError, {
+    if (error) {
+      void showFailureToast(error, {
         title: `Failed to load ${location.name}`,
       });
     }
-  }, [forecastError, location.name]);
+  }, [error, location.name]);
 
-  const today = useMemo(() => {
-    try {
-      const timeseries = forecastData?.properties?.timeseries ?? [];
-      return buildDailyForecast(
-        timeseries as Array<{ time: string; data: unknown }>,
-        location.timezone,
-        forecastDays,
-      )[0];
-    } catch {
-      return undefined;
-    }
-  }, [forecastData, forecastDays, location.timezone]);
-
-  const alerts: WeatherAlert[] = useMemo(() => {
-    const result: WeatherAlert[] = [];
-    const features = alertsData?.features ?? [];
-    for (const feature of features) {
-      const p = feature.properties;
-      if (p?.event) {
-        result.push({
-          area: p.area ?? "",
-          event: p.event,
-          headline: p.headline ?? "",
-          description: p.description ?? "",
-          severity:
-            (p.severity?.toLowerCase() as WeatherAlert["severity"]) ??
-            "unknown",
-        });
-      }
-    }
-    return result;
-  }, [alertsData]);
-
-  const maxUvIndex = useMemo(() => {
-    if (!today || !uvData?.hourly?.time || !uvData.hourly.uv_index) {
-      return undefined;
-    }
-
-    let maxUv = 0;
-    for (let i = 0; i < uvData.hourly.time.length; i++) {
-      const time = uvData.hourly.time[i];
-      const uv = uvData.hourly.uv_index[i];
-      if (time?.startsWith(today.dateKey) && uv !== undefined && uv > maxUv) {
-        maxUv = uv;
-      }
-    }
-    return maxUv;
-  }, [today, uvData]);
-
-  const currentAqi = useMemo(() => {
-    const values = airQualityData?.hourly?.us_aqi ?? [];
-    return values.find((value) => value !== undefined);
-  }, [airQualityData]);
-
+  const maxUvIndex = today?.maxUvIndex;
+  const currentAqi = today ? aqiForDate(today.dateKey) : undefined;
+  const alertCount = today ? alertCountForDate(today.dateKey) : alerts.length;
   const currentHour = today ? getCurrentHour(today) : undefined;
   const comfortScore = today
-    ? buildComfortScore(today, maxUvIndex, currentAqi, alerts.length)
+    ? buildComfortScore(today, maxUvIndex, currentAqi, alertCount)
     : undefined;
   const updatedLabel = formatIsoTimeInTimezone(
-    forecastData?.properties?.meta?.updated_at,
+    forecastUpdatedAt,
     location.timezone,
   );
 
@@ -138,22 +77,12 @@ function useComparisonData(location: Location): ComparisonData {
     maxUvIndex,
     currentAqi,
     alerts,
+    alertCount,
     comfortScore,
     updatedLabel,
-    error: forecastError,
-    isLoading:
-      isForecastLoading ||
-      isAlertsLoading ||
-      isUvLoading ||
-      isAirQualityLoading,
+    error,
+    isLoading,
   };
-}
-
-function scoreColor(score?: number): Color {
-  if (score === undefined) return Color.SecondaryText;
-  if (score >= 75) return Color.Green;
-  if (score >= 50) return Color.Yellow;
-  return Color.Red;
 }
 
 function betterPick(first: ComparisonData, second: ComparisonData) {
@@ -180,7 +109,7 @@ function reasonForPick(winner: ComparisonData, other: ComparisonData): string {
   ) {
     reasons.push("lighter wind");
   }
-  if (winner.alerts.length < other.alerts.length) {
+  if (winner.alertCount < other.alertCount) {
     reasons.push("fewer alerts");
   }
   return reasons.length > 0 ? reasons.join(", ") : "better overall conditions";
@@ -190,7 +119,7 @@ function ComparisonRow(props: { data: ComparisonData }) {
   const { data } = props;
   const prefs = getPrefs();
   const tags = data.today
-    ? buildDecisionTags(data.today, data.maxUvIndex, data.alerts.length)
+    ? buildDecisionTags(data.today, data.maxUvIndex, data.alertCount)
     : [];
   const subtitle =
     data.today && data.currentHour
@@ -216,7 +145,7 @@ function ComparisonRow(props: { data: ComparisonData }) {
               {
                 tag: {
                   value: `Comfort ${data.comfortScore}`,
-                  color: scoreColor(data.comfortScore),
+                  color: comfortColor(data.comfortScore),
                 },
               },
             ]
@@ -275,7 +204,7 @@ function CompareWeatherView(props: { first: Location; second: Location }) {
                   {
                     tag: {
                       value: `Comfort ${winner.comfortScore}`,
-                      color: scoreColor(winner.comfortScore),
+                      color: comfortColor(winner.comfortScore),
                     },
                   },
                 ]
@@ -350,7 +279,7 @@ function CompareWeatherView(props: { first: Location; second: Location }) {
                     },
                   ]
                 : []),
-              ...(data.maxUvIndex !== undefined && data.maxUvIndex > 0
+              ...(data.maxUvIndex !== undefined && data.maxUvIndex >= 0.5
                 ? [
                     {
                       tag: {
@@ -360,14 +289,14 @@ function CompareWeatherView(props: { first: Location; second: Location }) {
                     },
                   ]
                 : []),
-              ...(data.alerts.length > 0
+              ...(data.alertCount > 0
                 ? [
                     {
                       tag: {
                         value:
-                          data.alerts.length === 1
+                          data.alertCount === 1
                             ? "1 alert"
-                            : `${data.alerts.length} alerts`,
+                            : `${data.alertCount} alerts`,
                         color: Color.Red,
                       },
                     },

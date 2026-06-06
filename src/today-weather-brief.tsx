@@ -1,89 +1,63 @@
 import {
   Action,
   ActionPanel,
-  Color,
   Icon,
   List,
   LaunchType,
   launchCommand,
 } from "@raycast/api";
 import { showFailureToast } from "@raycast/utils";
-import { useEffect, useMemo } from "react";
-import type { Location, WeatherAlert } from "./types";
-import {
-  useAirQuality,
-  useDefaultLocation,
-  useForecast,
-  useSunEvents,
-  useUVIndex,
-  useWeatherAlerts,
-} from "./hooks";
-import { getForecastDays, getPrefs } from "./preferences";
-import { AlertBadge } from "./components";
-import { buildDailyForecast } from "./utils/forecast";
+import { useEffect } from "react";
+
+import type { Location } from "./types";
+import { useLocationSwitcher, useSunEvents, useWeatherData } from "./hooks";
+import type { SearchBarDropdown } from "./hooks";
+import { getPrefs } from "./preferences";
+import { AlertBadge, CommonActions, ShouldIActions } from "./components";
 import { iconForSymbol } from "./utils/icons";
 import {
   colorForAqi,
   colorForPrecipitation,
+  colorForProbability,
   colorForTemperature,
   colorForUV,
   colorForWind,
+  comfortColor,
 } from "./utils/colors";
 import {
   buildComfortScore,
   buildDecisionTags,
   buildPersonalitySummary,
   formatIsoTimeInTimezone,
-  formatLocalDateTimeInTimezone,
-  formatUnixTimeInTimezone,
   getCurrentHour,
   locationSummary,
-  parseWeatherAlerts,
 } from "./utils";
 import { formatTemperature, formatTemperatureRange } from "./utils/temperature";
 import { formatPrecipitation, formatWindSpeed } from "./utils/units";
-import { CommonActions, ShouldIActions } from "./components";
 
-function BriefView(props: { location: Location }) {
-  const { location } = props;
+function BriefView(props: {
+  location: Location;
+  dropdown?: SearchBarDropdown;
+}) {
+  const { location, dropdown } = props;
   const prefs = getPrefs();
-  const forecastDays = getForecastDays();
   const {
-    data,
+    today,
+    alerts,
+    alertCountForDate,
+    currentAqi,
     error,
     isLoading,
     isUsingFallback,
+    isStale,
     cacheUpdatedAt,
+    forecastUpdatedAt,
+    aqiUsingFallback,
+    aqiCacheUpdatedAt,
     revalidate,
-  } = useForecast(location);
-  const { data: alertsData } = useWeatherAlerts(location);
-  const {
-    data: airQualityData,
-    isUsingFallback: isAqiUsingFallback,
-    cacheUpdatedAt: aqiCacheUpdatedAt,
-    revalidate: revalidateAqi,
-  } = useAirQuality(location);
-  const {
-    data: uvData,
-    isUsingFallback: isUvUsingFallback,
-    cacheUpdatedAt: uvCacheUpdatedAt,
-    revalidate: revalidateUv,
-  } = useUVIndex(location, forecastDays);
+    revalidateAqi,
+  } = useWeatherData(location);
 
-  const dailyForecast = useMemo(() => {
-    try {
-      const timeseries = data?.properties?.timeseries ?? [];
-      return buildDailyForecast(
-        timeseries as Array<{ time: string; data: unknown }>,
-        location.timezone,
-        forecastDays,
-      );
-    } catch {
-      return [];
-    }
-  }, [data, forecastDays, location.timezone]);
-
-  const today = dailyForecast[0];
   const currentHour = today ? getCurrentHour(today) : undefined;
   const shouldLoadSunEvents = today?.dateKey !== undefined;
   const {
@@ -104,89 +78,29 @@ function BriefView(props: { location: Location }) {
     }
   }, [sunError]);
 
-  const alerts: WeatherAlert[] = useMemo(
-    () => parseWeatherAlerts(alertsData),
-    [alertsData],
-  );
-
-  const currentAqi = useMemo(() => {
-    const values = airQualityData?.hourly?.us_aqi ?? [];
-    return values.find((value) => value !== undefined);
-  }, [airQualityData]);
-  const currentAqiUpdatedAt = useMemo(() => {
-    const values = airQualityData?.hourly?.us_aqi ?? [];
-    const times = airQualityData?.hourly?.time ?? [];
-    const index = values.findIndex((value) => value !== undefined);
-    return index >= 0 ? times[index] : undefined;
-  }, [airQualityData]);
-
-  const uvByDateHour = useMemo(() => {
-    const map = new Map<string, number>();
-    if (uvData?.hourly?.time && uvData?.hourly?.uv_index) {
-      for (let i = 0; i < uvData.hourly.time.length; i++) {
-        const time = uvData.hourly.time[i];
-        const uv = uvData.hourly.uv_index[i];
-        if (time && uv !== undefined) {
-          const dateKey = time.slice(0, 10);
-          const hour = parseInt(time.slice(11, 13), 10);
-          map.set(`${dateKey}-${hour}`, uv);
-        }
-      }
-    }
-    return map;
-  }, [uvData]);
-
-  const currentUv =
-    today && currentHour
-      ? uvByDateHour.get(`${today.dateKey}-${currentHour.hour}`)
-      : undefined;
-  const currentUvUpdatedAt =
-    today && currentHour
-      ? uvData?.hourly?.time?.find((time) => {
-          if (!time) return false;
-          const hour = parseInt(time.slice(11, 13), 10);
-          return time.startsWith(today.dateKey) && hour === currentHour.hour;
-        })
-      : undefined;
+  const todayAlertCount = today ? alertCountForDate(today.dateKey) : 0;
+  const currentUv = currentHour?.uvIndex;
   const comfortScore = today
-    ? buildComfortScore(today, currentUv, currentAqi, alerts.length)
+    ? buildComfortScore(today, currentUv, currentAqi, todayAlertCount)
     : undefined;
-  const comfortColor =
-    comfortScore === undefined
-      ? Color.SecondaryText
-      : comfortScore >= 75
-        ? Color.Green
-        : comfortScore >= 50
-          ? Color.Yellow
-          : Color.Red;
   const decisionTags = today
-    ? buildDecisionTags(today, currentUv, alerts.length)
+    ? buildDecisionTags(today, currentUv, todayAlertCount)
     : [];
   const updatedLabel = formatIsoTimeInTimezone(
-    data?.properties?.meta?.updated_at,
+    forecastUpdatedAt,
     location.timezone,
   );
   const forecastFreshnessLabel = isUsingFallback
-    ? `Cached fetch ${formatIsoTimeInTimezone(cacheUpdatedAt, location.timezone)}`
+    ? `Cached fetch ${formatIsoTimeInTimezone(cacheUpdatedAt, location.timezone)}${
+        isStale ? " (stale)" : ""
+      }`
     : `Forecast ${updatedLabel}`;
-  const aqiFreshnessLabel = isAqiUsingFallback
+  const aqiFreshnessLabel = aqiUsingFallback
     ? `Cached fetch ${formatIsoTimeInTimezone(
         aqiCacheUpdatedAt,
         location.timezone,
       )}`
-    : `AQI sample ${formatUnixTimeInTimezone(
-        currentAqiUpdatedAt,
-        location.timezone,
-      )}`;
-  const uvFreshnessLabel = isUvUsingFallback
-    ? `Cached fetch ${formatIsoTimeInTimezone(
-        uvCacheUpdatedAt,
-        location.timezone,
-      )}`
-    : `UV sample ${formatLocalDateTimeInTimezone(
-        currentUvUpdatedAt,
-        location.timezone,
-      )}`;
+    : "Live sample";
   const sunriseLabel = formatIsoTimeInTimezone(
     sunData?.properties?.sunrise?.time,
     location.timezone,
@@ -214,6 +128,7 @@ function BriefView(props: { location: Location }) {
     <List
       isLoading={isLoading || (shouldLoadSunEvents && isSunLoading)}
       searchBarPlaceholder={`Weather brief for ${location.name}`}
+      searchBarAccessory={dropdown}
     >
       {alerts.length > 0 && <AlertBadge alerts={alerts} />}
       {today && currentHour ? (
@@ -241,7 +156,7 @@ function BriefView(props: { location: Location }) {
                       {
                         tag: {
                           value: `Comfort ${comfortScore}`,
-                          color: comfortColor,
+                          color: comfortColor(comfortScore),
                         },
                       },
                     ]
@@ -255,6 +170,20 @@ function BriefView(props: { location: Location }) {
                     color: colorForPrecipitation(currentHour.precipitationMm),
                   },
                 },
+                ...(currentHour.precipitationProbabilityPct !== undefined
+                  ? [
+                      {
+                        tag: {
+                          value: `${Math.round(
+                            currentHour.precipitationProbabilityPct,
+                          )}%`,
+                          color: colorForProbability(
+                            currentHour.precipitationProbabilityPct,
+                          ),
+                        },
+                      },
+                    ]
+                  : []),
                 ...(currentHour.windSpeedMs !== undefined
                   ? [
                       {
@@ -278,7 +207,7 @@ function BriefView(props: { location: Location }) {
                       },
                     ]
                   : []),
-                ...(currentUv !== undefined && currentUv > 0
+                ...(currentUv !== undefined && currentUv >= 0.5
                   ? [
                       {
                         tag: {
@@ -304,7 +233,7 @@ function BriefView(props: { location: Location }) {
                     day={today}
                     maxUvIndex={currentUv}
                     aqi={currentAqi}
-                    alertCount={alerts.length}
+                    alertCount={todayAlertCount}
                   />
                   <CommonActions />
                 </ActionPanel>
@@ -327,7 +256,7 @@ function BriefView(props: { location: Location }) {
                     day={today}
                     maxUvIndex={currentUv}
                     aqi={currentAqi}
-                    alertCount={alerts.length}
+                    alertCount={todayAlertCount}
                   />
                   <CommonActions />
                 </ActionPanel>
@@ -391,30 +320,15 @@ function BriefView(props: { location: Location }) {
                 </ActionPanel>
               }
             />
-            <List.Item
-              title="UV"
-              subtitle={uvFreshnessLabel}
-              icon={Icon.Sun}
-              actions={
-                <ActionPanel>
-                  <Action
-                    title="Refresh UV"
-                    icon={Icon.ArrowClockwise}
-                    onAction={revalidateUv}
-                  />
-                  <CommonActions />
-                </ActionPanel>
-              }
-            />
           </List.Section>
           <List.Section title="Sources">
             <List.Item
-              title="Forecast and Alerts"
+              title="Forecast, UV, and Alerts"
               subtitle="met.no Locationforecast and MetAlerts"
               icon={Icon.Cloud}
             />
             <List.Item
-              title="Air Quality and UV"
+              title="Air Quality"
               subtitle="Open-Meteo"
               icon={Icon.Wind}
             />
@@ -458,7 +372,7 @@ function BriefView(props: { location: Location }) {
 }
 
 export default function Command() {
-  const { location, isLoading } = useDefaultLocation();
+  const { location, isLoading, dropdown } = useLocationSwitcher();
 
   if (isLoading) {
     return <List isLoading searchBarPlaceholder="Loading weather brief" />;
@@ -490,5 +404,5 @@ export default function Command() {
     );
   }
 
-  return <BriefView location={location} />;
+  return <BriefView location={location} dropdown={dropdown} />;
 }

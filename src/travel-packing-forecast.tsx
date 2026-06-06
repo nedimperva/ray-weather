@@ -8,17 +8,12 @@ import {
 } from "@raycast/api";
 import { showFailureToast } from "@raycast/utils";
 import { useEffect, useMemo } from "react";
-import type { Location, WeatherAlert } from "./types";
-import {
-  useAirQuality,
-  useDefaultLocation,
-  useForecast,
-  useUVIndex,
-  useWeatherAlerts,
-} from "./hooks";
-import { getForecastDays, getPrefs } from "./preferences";
+
+import type { Location } from "./types";
+import { useLocationSwitcher, useWeatherData } from "./hooks";
+import type { SearchBarDropdown } from "./hooks";
+import { getPrefs } from "./preferences";
 import { AlertBadge, CommonActions, ShouldIActions } from "./components";
-import { buildDailyForecast } from "./utils/forecast";
 import { iconForSymbol } from "./utils/icons";
 import {
   colorForPrecipitation,
@@ -30,19 +25,26 @@ import {
   buildPackingSuggestions,
   buildPersonalitySummary,
   locationSummary,
-  parseWeatherAlerts,
 } from "./utils";
 import { formatTemperatureRange } from "./utils/temperature";
 import { formatPrecipitation, formatWindSpeed } from "./utils/units";
 
-function TravelPackingView(props: { location: Location }) {
-  const { location } = props;
+function TravelPackingView(props: {
+  location: Location;
+  dropdown?: SearchBarDropdown;
+}) {
+  const { location, dropdown } = props;
   const prefs = getPrefs();
-  const forecastDays = getForecastDays();
-  const { data, error, isLoading, revalidate } = useForecast(location);
-  const { data: alertsData } = useWeatherAlerts(location);
-  const { data: uvData } = useUVIndex(location, forecastDays);
-  const { data: airQualityData } = useAirQuality(location);
+  const {
+    days,
+    alerts,
+    alertCountForDate,
+    currentAqi,
+    aqiForDate,
+    error,
+    isLoading,
+    revalidate,
+  } = useWeatherData(location);
 
   useEffect(() => {
     if (error) {
@@ -52,43 +54,16 @@ function TravelPackingView(props: { location: Location }) {
     }
   }, [error]);
 
-  const dailyForecast = useMemo(() => {
-    try {
-      const timeseries = data?.properties?.timeseries ?? [];
-      return buildDailyForecast(
-        timeseries as Array<{ time: string; data: unknown }>,
-        location.timezone,
-        forecastDays,
-      );
-    } catch {
-      return [];
-    }
-  }, [data, forecastDays, location.timezone]);
-  const alerts: WeatherAlert[] = useMemo(
-    () => parseWeatherAlerts(alertsData),
-    [alertsData],
-  );
-  const currentAqi = useMemo(() => {
-    const values = airQualityData?.hourly?.us_aqi ?? [];
-    return values.find((value) => value !== undefined);
-  }, [airQualityData]);
   const uvMaxByDate = useMemo(() => {
     const map = new Map<string, number>();
-    if (uvData?.hourly?.time && uvData?.hourly?.uv_index) {
-      for (let i = 0; i < uvData.hourly.time.length; i++) {
-        const time = uvData.hourly.time[i];
-        const uv = uvData.hourly.uv_index[i];
-        if (time && uv !== undefined) {
-          const dateKey = time.slice(0, 10);
-          const current = map.get(dateKey);
-          if (current === undefined || uv > current) map.set(dateKey, uv);
-        }
-      }
+    for (const day of days) {
+      if (day.maxUvIndex !== undefined) map.set(day.dateKey, day.maxUvIndex);
     }
     return map;
-  }, [uvData]);
+  }, [days]);
+
   const suggestions = buildPackingSuggestions(
-    dailyForecast,
+    days,
     uvMaxByDate,
     currentAqi,
     alerts.length,
@@ -100,11 +75,11 @@ function TravelPackingView(props: { location: Location }) {
       (suggestion) => `- ${suggestion.item}: ${suggestion.reason}`,
     ),
     "",
-    ...dailyForecast.map(
+    ...days.map(
       (day) =>
         `- ${day.dayAndDate}: ${buildPersonalitySummary(
           day,
-          uvMaxByDate.get(day.dateKey),
+          day.maxUvIndex,
         )}, ${formatTemperatureRange(
           day.minTempC,
           day.maxTempC,
@@ -120,6 +95,7 @@ function TravelPackingView(props: { location: Location }) {
     <List
       isLoading={isLoading}
       searchBarPlaceholder={`Packing forecast for ${location.name}`}
+      searchBarAccessory={dropdown}
     >
       {alerts.length > 0 && <AlertBadge alerts={alerts} />}
       <List.Section title="Packing List">
@@ -147,8 +123,8 @@ function TravelPackingView(props: { location: Location }) {
         ))}
       </List.Section>
       <List.Section title={locationSummary(location)}>
-        {dailyForecast.map((day) => {
-          const maxUvIndex = uvMaxByDate.get(day.dateKey);
+        {days.map((day) => {
+          const maxUvIndex = day.maxUvIndex;
           return (
             <List.Item
               key={day.dateKey}
@@ -192,7 +168,7 @@ function TravelPackingView(props: { location: Location }) {
                     color: colorForWind(day.avgWindSpeedMs),
                   },
                 },
-                ...(maxUvIndex !== undefined && maxUvIndex > 0
+                ...(maxUvIndex !== undefined && maxUvIndex >= 0.5
                   ? [
                       {
                         tag: {
@@ -212,8 +188,8 @@ function TravelPackingView(props: { location: Location }) {
                   <ShouldIActions
                     day={day}
                     maxUvIndex={maxUvIndex}
-                    aqi={currentAqi}
-                    alertCount={alerts.length}
+                    aqi={aqiForDate(day.dateKey)}
+                    alertCount={alertCountForDate(day.dateKey)}
                   />
                   <CommonActions />
                 </ActionPanel>
@@ -227,7 +203,7 @@ function TravelPackingView(props: { location: Location }) {
 }
 
 export default function Command() {
-  const { location, isLoading } = useDefaultLocation();
+  const { location, isLoading, dropdown } = useLocationSwitcher();
 
   if (isLoading) {
     return <List isLoading searchBarPlaceholder="Loading packing forecast" />;
@@ -259,5 +235,5 @@ export default function Command() {
     );
   }
 
-  return <TravelPackingView location={location} />;
+  return <TravelPackingView location={location} dropdown={dropdown} />;
 }

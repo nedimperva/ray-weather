@@ -51,6 +51,7 @@ export function buildDecisionTags(
 ): WeatherDecisionTag[] {
   const tags: WeatherDecisionTag[] = [];
   const rainHour = firstRainHour(day);
+  const rainProbability = day.maxPrecipitationProbabilityPct;
 
   if (alertCount > 0) {
     tags.push({
@@ -59,10 +60,22 @@ export function buildDecisionTags(
     });
   }
 
-  if (day.precipitationMm >= 2) {
-    tags.push({ value: "Bring umbrella", color: Color.Blue });
-  } else if (day.precipitationMm >= 0.2) {
-    tags.push({ value: "Rain possible", color: Color.Blue });
+  if (day.precipitationMm >= 2 || (rainProbability ?? 0) >= 60) {
+    tags.push({
+      value:
+        rainProbability !== undefined
+          ? `Rain likely ${Math.round(rainProbability)}%`
+          : "Bring umbrella",
+      color: Color.Blue,
+    });
+  } else if (day.precipitationMm >= 0.2 || (rainProbability ?? 0) >= 30) {
+    tags.push({
+      value:
+        rainProbability !== undefined
+          ? `Rain ${Math.round(rainProbability)}%`
+          : "Rain possible",
+      color: Color.Blue,
+    });
   }
 
   if (rainHour) {
@@ -132,14 +145,20 @@ export function buildShouldIDecisions(
     0,
   );
   const fogRisk = (day.avgFogCoveragePct ?? 0) >= 30;
+  const rainProbability = day.maxPrecipitationProbabilityPct;
 
   const umbrella =
-    day.precipitationMm >= 2 || afternoonRain >= 1 || rainyHour !== undefined
+    day.precipitationMm >= 2 ||
+    afternoonRain >= 1 ||
+    rainyHour !== undefined ||
+    (rainProbability ?? 0) >= 60
       ? {
           answer: "Yes",
           reason: rainyHour
             ? `rain starts around ${rainyHour.localTimeLabel}`
-            : `${day.precipitationMm.toFixed(1)} mm expected`,
+            : rainProbability !== undefined
+              ? `${Math.round(rainProbability)}% chance of rain`
+              : `${day.precipitationMm.toFixed(1)} mm expected`,
           color: Color.Blue,
         }
       : {

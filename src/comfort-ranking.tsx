@@ -1,7 +1,6 @@
 import {
   Action,
   ActionPanel,
-  Color,
   Icon,
   LaunchType,
   List,
@@ -9,17 +8,12 @@ import {
 } from "@raycast/api";
 import { showFailureToast } from "@raycast/utils";
 import { useEffect, useMemo } from "react";
-import type { Location, WeatherAlert } from "./types";
-import {
-  useAirQuality,
-  useDefaultLocation,
-  useForecast,
-  useUVIndex,
-  useWeatherAlerts,
-} from "./hooks";
-import { getForecastDays, getPrefs } from "./preferences";
+
+import type { Location } from "./types";
+import { useLocationSwitcher, useWeatherData } from "./hooks";
+import type { SearchBarDropdown } from "./hooks";
+import { getPrefs } from "./preferences";
 import { AlertBadge, CommonActions, ShouldIActions } from "./components";
-import { buildDailyForecast } from "./utils/forecast";
 import { iconForSymbol } from "./utils/icons";
 import {
   colorForAqi,
@@ -27,6 +21,7 @@ import {
   colorForTemperature,
   colorForUV,
   colorForWind,
+  comfortColor,
 } from "./utils/colors";
 import {
   buildComfortScore,
@@ -34,16 +29,9 @@ import {
   buildPersonalitySummary,
   formatIsoTimeInTimezone,
   locationSummary,
-  parseWeatherAlerts,
 } from "./utils";
 import { formatTemperatureRange } from "./utils/temperature";
 import { formatPrecipitation, formatWindSpeed } from "./utils/units";
-
-function scoreColor(score: number): Color {
-  if (score >= 75) return Color.Green;
-  if (score >= 50) return Color.Yellow;
-  return Color.Red;
-}
 
 function rankLabel(index: number): string {
   if (index === 0) return "Best";
@@ -52,25 +40,25 @@ function rankLabel(index: number): string {
   return `#${index + 1}`;
 }
 
-function ComfortRankingView(props: { location: Location }) {
-  const { location } = props;
+function ComfortRankingView(props: {
+  location: Location;
+  dropdown?: SearchBarDropdown;
+}) {
+  const { location, dropdown } = props;
   const prefs = getPrefs();
-  const forecastDays = getForecastDays();
   const {
-    data,
+    days,
+    alerts,
+    alertCountForDate,
+    aqiForDate,
     error,
     isLoading,
     isUsingFallback,
+    isStale,
     cacheUpdatedAt,
+    aqiUsingFallback,
     revalidate,
-  } = useForecast(location);
-  const { data: alertsData } = useWeatherAlerts(location);
-  const { data: uvData, isUsingFallback: isUvUsingFallback } = useUVIndex(
-    location,
-    forecastDays,
-  );
-  const { data: airQualityData, isUsingFallback: isAqiUsingFallback } =
-    useAirQuality(location);
+  } = useWeatherData(location);
 
   useEffect(() => {
     if (error) {
@@ -78,56 +66,20 @@ function ComfortRankingView(props: { location: Location }) {
     }
   }, [error]);
 
-  const dailyForecast = useMemo(() => {
-    try {
-      const timeseries = data?.properties?.timeseries ?? [];
-      return buildDailyForecast(
-        timeseries as Array<{ time: string; data: unknown }>,
-        location.timezone,
-        forecastDays,
-      );
-    } catch {
-      return [];
-    }
-  }, [data, forecastDays, location.timezone]);
-
-  const alerts: WeatherAlert[] = useMemo(
-    () => parseWeatherAlerts(alertsData),
-    [alertsData],
-  );
-  const currentAqi = useMemo(() => {
-    const values = airQualityData?.hourly?.us_aqi ?? [];
-    return values.find((value) => value !== undefined);
-  }, [airQualityData]);
-  const uvMaxByDate = useMemo(() => {
-    const map = new Map<string, number>();
-    if (uvData?.hourly?.time && uvData?.hourly?.uv_index) {
-      for (let i = 0; i < uvData.hourly.time.length; i++) {
-        const time = uvData.hourly.time[i];
-        const uv = uvData.hourly.uv_index[i];
-        if (time && uv !== undefined) {
-          const dateKey = time.slice(0, 10);
-          const current = map.get(dateKey);
-          if (current === undefined || uv > current) map.set(dateKey, uv);
-        }
-      }
-    }
-    return map;
-  }, [uvData]);
   const rankedDays = useMemo(() => {
-    return dailyForecast
+    return days
       .map((day) => {
-        const maxUvIndex = uvMaxByDate.get(day.dateKey);
+        const maxUvIndex = day.maxUvIndex;
         const comfortScore = buildComfortScore(
           day,
           maxUvIndex,
-          currentAqi,
-          alerts.length,
+          aqiForDate(day.dateKey),
+          alertCountForDate(day.dateKey),
         );
         return { day, maxUvIndex, comfortScore };
       })
       .sort((a, b) => b.comfortScore - a.comfortScore);
-  }, [alerts.length, currentAqi, dailyForecast, uvMaxByDate]);
+  }, [alertCountForDate, aqiForDate, days]);
   const best = rankedDays[0];
   const copyRanking = rankedDays
     .slice(0, 5)
@@ -141,16 +93,17 @@ function ComfortRankingView(props: { location: Location }) {
     <List
       isLoading={isLoading}
       searchBarPlaceholder={`Comfort ranking for ${location.name}`}
+      searchBarAccessory={dropdown}
     >
       {alerts.length > 0 && <AlertBadge alerts={alerts} />}
-      {isUsingFallback || isUvUsingFallback || isAqiUsingFallback ? (
+      {isUsingFallback || aqiUsingFallback ? (
         <List.Section title="Cache Status">
           <List.Item
             title="Using cached data"
             subtitle={`Last successful forecast fetch ${formatIsoTimeInTimezone(
               cacheUpdatedAt,
               location.timezone,
-            )}`}
+            )}${isStale ? " (stale)" : ""}`}
             icon={Icon.Clock}
             actions={
               <ActionPanel>
@@ -182,7 +135,7 @@ function ComfortRankingView(props: { location: Location }) {
                 {
                   tag: {
                     value: `Comfort ${best.comfortScore}`,
-                    color: scoreColor(best.comfortScore),
+                    color: comfortColor(best.comfortScore),
                   },
                 },
               ]}
@@ -200,8 +153,8 @@ function ComfortRankingView(props: { location: Location }) {
                   <ShouldIActions
                     day={best.day}
                     maxUvIndex={best.maxUvIndex}
-                    aqi={currentAqi}
-                    alertCount={alerts.length}
+                    aqi={aqiForDate(best.day.dateKey)}
+                    alertCount={alertCountForDate(best.day.dateKey)}
                   />
                   <CommonActions />
                 </ActionPanel>
@@ -210,10 +163,11 @@ function ComfortRankingView(props: { location: Location }) {
           </List.Section>
           <List.Section title={locationSummary(location)}>
             {rankedDays.map((ranked, index) => {
+              const dayAqi = aqiForDate(ranked.day.dateKey);
               const tags = buildDecisionTags(
                 ranked.day,
                 ranked.maxUvIndex,
-                alerts.length,
+                alertCountForDate(ranked.day.dateKey),
               );
               return (
                 <List.Item
@@ -233,7 +187,7 @@ function ComfortRankingView(props: { location: Location }) {
                     {
                       tag: {
                         value: `Comfort ${ranked.comfortScore}`,
-                        color: scoreColor(ranked.comfortScore),
+                        color: comfortColor(ranked.comfortScore),
                       },
                     },
                     ...tags.slice(0, 2).map((tag) => ({ tag })),
@@ -267,7 +221,8 @@ function ComfortRankingView(props: { location: Location }) {
                         color: colorForWind(ranked.day.avgWindSpeedMs),
                       },
                     },
-                    ...(ranked.maxUvIndex !== undefined && ranked.maxUvIndex > 0
+                    ...(ranked.maxUvIndex !== undefined &&
+                    ranked.maxUvIndex >= 0.5
                       ? [
                           {
                             tag: {
@@ -277,12 +232,12 @@ function ComfortRankingView(props: { location: Location }) {
                           },
                         ]
                       : []),
-                    ...(currentAqi !== undefined
+                    ...(dayAqi !== undefined
                       ? [
                           {
                             tag: {
-                              value: `AQI ${currentAqi}`,
-                              color: colorForAqi(currentAqi),
+                              value: `AQI ${dayAqi}`,
+                              color: colorForAqi(dayAqi),
                             },
                           },
                         ]
@@ -305,8 +260,8 @@ function ComfortRankingView(props: { location: Location }) {
                       <ShouldIActions
                         day={ranked.day}
                         maxUvIndex={ranked.maxUvIndex}
-                        aqi={currentAqi}
-                        alertCount={alerts.length}
+                        aqi={dayAqi}
+                        alertCount={alertCountForDate(ranked.day.dateKey)}
                       />
                       <CommonActions />
                     </ActionPanel>
@@ -337,7 +292,7 @@ function ComfortRankingView(props: { location: Location }) {
 }
 
 export default function Command() {
-  const { location, isLoading } = useDefaultLocation();
+  const { location, isLoading, dropdown } = useLocationSwitcher();
 
   if (isLoading) {
     return <List isLoading searchBarPlaceholder="Loading comfort ranking" />;
@@ -369,5 +324,5 @@ export default function Command() {
     );
   }
 
-  return <ComfortRankingView location={location} />;
+  return <ComfortRankingView location={location} dropdown={dropdown} />;
 }

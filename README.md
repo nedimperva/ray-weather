@@ -433,6 +433,19 @@ npm test
 
 Raycast lint validates the package schema and author online. If your environment blocks network access, package validation may fail even when TypeScript and ESLint pass.
 
+## Store Screenshots
+
+Store screenshots live in `metadata/` as `forecast-pilot-{n}.png`, sized 2000x1250 (the Raycast store spec).
+
+The current images are generated mockups of the List UI built from representative content (multiple favorite locations and active alerts) so the layout is reproducible:
+
+```bash
+pip install Pillow
+python3 scripts/render_screenshots.py
+```
+
+For a final store submission you can replace them with real captures from Raycast's built-in Window Capture (it exports at the same 2000x1250 size).
+
 ## met.no User-Agent
 
 met.no requires a custom `User-Agent` with app identity and contact information.

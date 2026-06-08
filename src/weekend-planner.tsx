@@ -15,6 +15,7 @@ import { useLocationSwitcher, useWeatherData } from "./hooks";
 import type { SearchBarDropdown } from "./hooks";
 import { getPrefs } from "./preferences";
 import { AlertBadge, CommonActions } from "./components";
+import { CopyWeekendPlanImageAction } from "./components/CopyWeekendPlanImageAction";
 import { iconForSymbol } from "./utils/icons";
 import {
   colorForPrecipitation,
@@ -24,61 +25,16 @@ import {
   comfortColor,
 } from "./utils/colors";
 import {
+  buildWeekendPlan,
   buildComfortScore,
   buildDecisionTags,
   buildPersonalitySummary,
-  dateFromDateKey,
   formatIsoTimeInTimezone,
   locationSummary,
+  reasonForPick,
 } from "./utils";
 import { formatTemperatureRange } from "./utils/temperature";
 import { formatPrecipitation, formatWindSpeed } from "./utils/units";
-
-function weekdayIndex(day: DailyForecast): number {
-  return dateFromDateKey(day.dateKey).getUTCDay();
-}
-
-function weekendDaysFromForecast(days: DailyForecast[]): DailyForecast[] {
-  const saturday = days.find((day) => weekdayIndex(day) === 6);
-  const sundayAfterSaturday = saturday
-    ? days.find(
-        (day) => day.dateKey > saturday.dateKey && weekdayIndex(day) === 0,
-      )
-    : undefined;
-
-  if (saturday && sundayAfterSaturday) return [saturday, sundayAfterSaturday];
-  const availableWeekendDays = days
-    .filter((day) => [0, 6].includes(weekdayIndex(day)))
-    .slice(0, 2);
-
-  return availableWeekendDays.length > 0
-    ? availableWeekendDays
-    : days.slice(0, 2);
-}
-
-function reasonForPick(
-  winner: DailyForecast,
-  other: DailyForecast,
-  winnerScore: number,
-  otherScore: number,
-): string {
-  const reasons: string[] = [
-    `${winnerScore - otherScore} comfort points higher`,
-  ];
-
-  if (winner.precipitationMm < other.precipitationMm) reasons.push("less rain");
-  if ((winner.avgWindSpeedMs ?? 0) < (other.avgWindSpeedMs ?? 0)) {
-    reasons.push("lighter wind");
-  }
-  if (winner.maxTempC > other.maxTempC && other.maxTempC < 10) {
-    reasons.push("warmer");
-  }
-  if (winner.maxTempC < other.maxTempC && other.maxTempC > 28) {
-    reasons.push("less hot");
-  }
-
-  return reasons.join(", ");
-}
 
 function WeekendDayRow(props: {
   day: DailyForecast;
@@ -164,27 +120,30 @@ function WeekendPlannerView(props: {
     }
   }, [error]);
 
-  const weekendDays = useMemo(() => weekendDaysFromForecast(days), [days]);
-  const isFallbackWeekend = weekendDays.some(
-    (day) => ![0, 6].includes(weekdayIndex(day)),
-  );
-  const scoredWeekendDays = weekendDays.map((day) => ({
-    day,
-    maxUvIndex: day.maxUvIndex,
-    comfortScore: buildComfortScore(
-      day,
-      day.maxUvIndex,
-      aqiForDate(day.dateKey),
-      alertCountForDate(day.dateKey),
-    ),
-  }));
-  const [bestDay, otherDay] = [...scoredWeekendDays].sort(
-    (a, b) => b.comfortScore - a.comfortScore,
+  const {
+    weekendDays,
+    isFallbackWeekend,
+    scoredWeekendDays,
+    bestDay,
+    otherDay,
+  } = useMemo(
+    () => buildWeekendPlan(days, { aqiForDate, alertCountForDate }),
+    [alertCountForDate, aqiForDate, days],
   );
   const updatedLabel = formatIsoTimeInTimezone(
     forecastUpdatedAt,
     location.timezone,
   );
+  const weekendImageInput = {
+    location,
+    days: scoredWeekendDays,
+    bestDay,
+    otherDay,
+    updatedLabel,
+    alerts,
+    preferences: prefs,
+    isFallbackWeekend,
+  };
   const copyPlan = bestDay
     ? `${locationSummary(location)} weekend pick: ${
         bestDay.day.dayAndDate
@@ -242,6 +201,7 @@ function WeekendPlannerView(props: {
                     title="Copy Weekend Plan"
                     content={copyPlan}
                   />
+                  <CopyWeekendPlanImageAction input={weekendImageInput} />
                   <Action
                     title="Refresh Weekend Planner"
                     icon={Icon.ArrowClockwise}

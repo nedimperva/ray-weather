@@ -352,7 +352,8 @@
   },
   "dependencies": {
     "@raycast/api": "^1.104.6",
-    "@raycast/utils": "^2.2.2"
+    "@raycast/utils": "^2.2.2",
+    "pureimage": "^0.4.18"
   },
   "devDependencies": {
     "@raycast/eslint-config": "^2.1.1",

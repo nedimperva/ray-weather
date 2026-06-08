@@ -7,13 +7,14 @@ import {
   launchCommand,
 } from "@raycast/api";
 import { showFailureToast } from "@raycast/utils";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 
 import type { Location } from "./types";
 import { useLocationSwitcher, useWeatherData } from "./hooks";
 import type { SearchBarDropdown } from "./hooks";
 import { getPrefs } from "./preferences";
 import { AlertBadge, CommonActions } from "./components";
+import { CopyWeekendPlanImageAction } from "./components/CopyWeekendPlanImageAction";
 import { iconForSymbol } from "./utils/icons";
 import {
   colorForPrecipitation,
@@ -24,6 +25,7 @@ import {
 import {
   buildComfortScore,
   buildDecisionTags,
+  buildWeekendPlan,
   buildPersonalitySummary,
   formatIsoTimeInTimezone,
   locationSummary,
@@ -58,6 +60,26 @@ function ShareForecastView(props: {
     forecastUpdatedAt,
     location.timezone,
   );
+  const {
+    weekendDays,
+    isFallbackWeekend,
+    scoredWeekendDays,
+    bestDay,
+    otherDay,
+  } = useMemo(
+    () => buildWeekendPlan(days, { aqiForDate, alertCountForDate }),
+    [alertCountForDate, aqiForDate, days],
+  );
+  const weekendImageInput = {
+    location,
+    days: scoredWeekendDays,
+    bestDay,
+    otherDay,
+    updatedLabel,
+    alerts,
+    preferences: prefs,
+    isFallbackWeekend,
+  };
   const markdown = [
     `# Weather for ${locationSummary(location)}`,
     "",
@@ -125,12 +147,38 @@ function ShareForecastView(props: {
     >
       {alerts.length > 0 && <AlertBadge alerts={alerts} />}
       <List.Section title="Share">
+        {bestDay ? (
+          <List.Item
+            title="Weekend Plan Image"
+            subtitle={`Pasteable PNG for ${weekendDays
+              .map((day) => day.shortDate)
+              .join(" / ")}`}
+            icon={Icon.Image}
+            actions={
+              <ActionPanel>
+                <CopyWeekendPlanImageAction input={weekendImageInput} />
+                <Action.CopyToClipboard
+                  title="Copy Compact Forecast"
+                  content={compact}
+                />
+                <Action.CopyToClipboard
+                  title="Copy Markdown Forecast"
+                  content={markdown}
+                />
+                <CommonActions />
+              </ActionPanel>
+            }
+          />
+        ) : null}
         <List.Item
           title="Markdown Forecast"
           subtitle="Table with temperature, rain, wind, UV, and comfort"
           icon={Icon.Document}
           actions={
             <ActionPanel>
+              {bestDay ? (
+                <CopyWeekendPlanImageAction input={weekendImageInput} />
+              ) : null}
               <Action.CopyToClipboard
                 title="Copy Markdown Forecast"
                 content={markdown}
@@ -154,6 +202,9 @@ function ShareForecastView(props: {
           icon={Icon.Text}
           actions={
             <ActionPanel>
+              {bestDay ? (
+                <CopyWeekendPlanImageAction input={weekendImageInput} />
+              ) : null}
               <Action.CopyToClipboard
                 title="Copy Compact Forecast"
                 content={compact}

@@ -8,3 +8,4 @@ export * from "./forecast";
 export * from "./weatherInsights";
 export * from "./alerts";
 export * from "./markdown";
+export * from "./weekendPlanner";

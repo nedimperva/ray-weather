@@ -1,4 +1,5 @@
 import {
+  Color,
   Icon,
   LaunchType,
   MenuBarExtra,
@@ -7,9 +8,9 @@ import {
 } from "@raycast/api";
 import { showFailureToast, useFetch } from "@raycast/utils";
 import { useEffect, useMemo } from "react";
-import type { MetNoForecastResponse } from "./types";
+import type { Location, MetNoForecastResponse } from "./types";
 import { MET_NO_FORECAST_API, APP_USER_AGENT } from "./constants";
-import { useDefaultLocation } from "./hooks";
+import { useDefaultLocation, useSunEvents, useWeatherAlerts } from "./hooks";
 import { getPrefs } from "./preferences";
 import { calculateFeelsLikeC, formatTemperature } from "./utils/temperature";
 import { formatWindSpeed, formatPrecipitation } from "./utils/units";
@@ -17,26 +18,36 @@ import {
   conditionLabelForSymbol,
   displayLocationName,
 } from "./utils/formatting";
-import { ensureValidTimeZone, formatIsoTimeInTimezone } from "./utils/dates";
+import {
+  dateKeyInTimezone,
+  ensureValidTimeZone,
+  formatIsoTimeInTimezone,
+} from "./utils/dates";
+import { parseWeatherAlerts, severityRank } from "./utils/alerts";
+import { adjustUvForClouds } from "./utils/uv";
 
-export default function MenuBarWeather() {
-  const { location, isLoading: isLocationLoading } = useDefaultLocation();
+const severityColors: Record<string, Color> = {
+  extreme: Color.Red,
+  severe: Color.Orange,
+  moderate: Color.Yellow,
+  minor: Color.Green,
+};
+
+function MenuBarContent(props: { location: Location }) {
+  const { location } = props;
   const prefs = getPrefs();
-
-  const url = useMemo(
-    () =>
-      location
-        ? `${MET_NO_FORECAST_API}?lat=${location.latitude.toFixed(4)}&lon=${location.longitude.toFixed(4)}`
-        : "",
-    [location],
+  const timeZone = ensureValidTimeZone(location.timezone);
+  const todayKey = useMemo(
+    () => dateKeyInTimezone(new Date(), timeZone),
+    [timeZone],
   );
 
+  const url = `${MET_NO_FORECAST_API}?lat=${location.latitude.toFixed(4)}&lon=${location.longitude.toFixed(4)}`;
   const {
     data,
     error,
     isLoading: isForecastLoading,
   } = useFetch<MetNoForecastResponse>(url, {
-    execute: !!location,
     keepPreviousData: true,
     headers: { "User-Agent": APP_USER_AGENT },
     parseResponse: async (response) => {
@@ -44,6 +55,8 @@ export default function MenuBarWeather() {
       return response.json() as Promise<MetNoForecastResponse>;
     },
   });
+  const { data: alertsData } = useWeatherAlerts(location);
+  const { data: sunData } = useSunEvents(location, todayKey);
 
   useEffect(() => {
     if (error) {
@@ -51,9 +64,14 @@ export default function MenuBarWeather() {
     }
   }, [error]);
 
-  const isLoading = isLocationLoading || isForecastLoading;
+  const alerts = useMemo(
+    () =>
+      parseWeatherAlerts(alertsData).sort(
+        (a, b) => severityRank(b.severity) - severityRank(a.severity),
+      ),
+    [alertsData],
+  );
 
-  // Parse current conditions
   const current = useMemo(() => {
     if (!data?.properties?.timeseries?.length) return null;
     const entry = data.properties.timeseries[0];
@@ -68,6 +86,10 @@ export default function MenuBarWeather() {
       entry.data?.next_1_hours?.summary?.symbol_code ?? "cloudy";
     const precipMm =
       entry.data?.next_1_hours?.details?.precipitation_amount ?? 0;
+    const uvIndex = adjustUvForClouds(
+      details.ultraviolet_index_clear_sky,
+      details.cloud_area_fraction,
+    );
 
     return {
       tempC,
@@ -77,15 +99,14 @@ export default function MenuBarWeather() {
       symbolCode,
       condition: conditionLabelForSymbol(symbolCode),
       precipMm,
+      uvIndex,
     };
   }, [data]);
 
-  // Parse upcoming hours
   const upcomingHours = useMemo(() => {
-    if (!data?.properties?.timeseries || !location) return [];
-    const tz = ensureValidTimeZone(location.timezone);
+    if (!data?.properties?.timeseries) return [];
     const formatter = new Intl.DateTimeFormat("en-US", {
-      timeZone: tz,
+      timeZone,
       hour: "numeric",
       minute: "2-digit",
     });
@@ -100,33 +121,9 @@ export default function MenuBarWeather() {
         condition: conditionLabelForSymbol(symbolCode),
       };
     });
-  }, [data, location]);
+  }, [data, timeZone]);
 
-  if (!location) {
-    return (
-      <MenuBarExtra icon={Icon.Cloud} isLoading={isLoading} tooltip="Weather">
-        <MenuBarExtra.Item
-          title="No location set"
-          subtitle="Pin a location from Search Weather"
-        />
-        <MenuBarExtra.Item
-          title="Open Search Weather"
-          onAction={() =>
-            void launchCommand({
-              name: "search-weather",
-              type: LaunchType.UserInitiated,
-            })
-          }
-        />
-        <MenuBarExtra.Separator />
-        <MenuBarExtra.Item
-          title="Preferences..."
-          onAction={openExtensionPreferences}
-        />
-      </MenuBarExtra>
-    );
-  }
-
+  const hasAlerts = alerts.length > 0;
   const title = current
     ? (() => {
         const temperature = formatTemperature(
@@ -162,13 +159,27 @@ export default function MenuBarWeather() {
     data?.properties?.meta?.updated_at,
     location.timezone,
   );
+  const sunriseLabel = formatIsoTimeInTimezone(
+    sunData?.properties?.sunrise?.time,
+    location.timezone,
+  );
+  const sunsetLabel = formatIsoTimeInTimezone(
+    sunData?.properties?.sunset?.time,
+    location.timezone,
+  );
 
   return (
     <MenuBarExtra
-      icon={Icon.Cloud}
+      icon={
+        hasAlerts ? { source: Icon.Warning, tintColor: Color.Red } : Icon.Cloud
+      }
       title={title}
-      isLoading={isLoading}
-      tooltip={`Weather for ${displayLocationName(location)}`}
+      isLoading={isForecastLoading}
+      tooltip={
+        hasAlerts
+          ? `${alerts.length} active alert${alerts.length === 1 ? "" : "s"} for ${displayLocationName(location)}`
+          : `Weather for ${displayLocationName(location)}`
+      }
     >
       <MenuBarExtra.Section title={displayLocationName(location)}>
         {current && (
@@ -192,9 +203,41 @@ export default function MenuBarWeather() {
             <MenuBarExtra.Item
               title={`Precipitation: ${formatPrecipitation(current.precipMm, prefs.precipitationUnit)}`}
             />
+            {current.uvIndex !== undefined && current.uvIndex >= 0.5 && (
+              <MenuBarExtra.Item
+                title={`UV index: ${current.uvIndex.toFixed(0)}`}
+              />
+            )}
             <MenuBarExtra.Item title={`Updated: ${updatedLabel}`} />
           </>
         )}
+      </MenuBarExtra.Section>
+
+      {hasAlerts && (
+        <MenuBarExtra.Section title="Weather Alerts">
+          {alerts.map((alert, index) => (
+            <MenuBarExtra.Item
+              key={`${alert.event}-${index}`}
+              icon={{
+                source: Icon.Warning,
+                tintColor: severityColors[alert.severity] ?? Color.Yellow,
+              }}
+              title={alert.event}
+              subtitle={alert.area || undefined}
+              onAction={() =>
+                void launchCommand({
+                  name: "severe-weather-alerts",
+                  type: LaunchType.UserInitiated,
+                })
+              }
+            />
+          ))}
+        </MenuBarExtra.Section>
+      )}
+
+      <MenuBarExtra.Section title="Daylight">
+        <MenuBarExtra.Item title={`Sunrise: ${sunriseLabel}`} icon={Icon.Sun} />
+        <MenuBarExtra.Item title={`Sunset: ${sunsetLabel}`} icon={Icon.Moon} />
       </MenuBarExtra.Section>
 
       {upcomingHours.length > 0 && (
@@ -224,4 +267,35 @@ export default function MenuBarWeather() {
       />
     </MenuBarExtra>
   );
+}
+
+export default function MenuBarWeather() {
+  const { location, isLoading } = useDefaultLocation();
+
+  if (!location) {
+    return (
+      <MenuBarExtra icon={Icon.Cloud} isLoading={isLoading} tooltip="Weather">
+        <MenuBarExtra.Item
+          title="No location set"
+          subtitle="Pin a location from Search Weather"
+        />
+        <MenuBarExtra.Item
+          title="Open Search Weather"
+          onAction={() =>
+            void launchCommand({
+              name: "search-weather",
+              type: LaunchType.UserInitiated,
+            })
+          }
+        />
+        <MenuBarExtra.Separator />
+        <MenuBarExtra.Item
+          title="Preferences..."
+          onAction={openExtensionPreferences}
+        />
+      </MenuBarExtra>
+    );
+  }
+
+  return <MenuBarContent location={location} />;
 }

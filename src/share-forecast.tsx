@@ -7,17 +7,13 @@ import {
   launchCommand,
 } from "@raycast/api";
 import { showFailureToast } from "@raycast/utils";
-import { useEffect, useMemo } from "react";
-import type { Location, WeatherAlert } from "./types";
-import {
-  useDefaultLocation,
-  useForecast,
-  useUVIndex,
-  useWeatherAlerts,
-} from "./hooks";
-import { getForecastDays, getPrefs } from "./preferences";
+import { useEffect } from "react";
+
+import type { Location } from "./types";
+import { useLocationSwitcher, useWeatherData } from "./hooks";
+import type { SearchBarDropdown } from "./hooks";
+import { getPrefs } from "./preferences";
 import { AlertBadge, CommonActions } from "./components";
-import { buildDailyForecast } from "./utils/forecast";
 import { iconForSymbol } from "./utils/icons";
 import {
   colorForPrecipitation,
@@ -31,18 +27,26 @@ import {
   buildPersonalitySummary,
   formatIsoTimeInTimezone,
   locationSummary,
-  parseWeatherAlerts,
 } from "./utils";
 import { formatTemperatureRange } from "./utils/temperature";
 import { formatPrecipitation, formatWindSpeed } from "./utils/units";
 
-function ShareForecastView(props: { location: Location }) {
-  const { location } = props;
+function ShareForecastView(props: {
+  location: Location;
+  dropdown?: SearchBarDropdown;
+}) {
+  const { location, dropdown } = props;
   const prefs = getPrefs();
-  const forecastDays = getForecastDays();
-  const { data, error, isLoading, revalidate } = useForecast(location);
-  const { data: alertsData } = useWeatherAlerts(location);
-  const { data: uvData } = useUVIndex(location, forecastDays);
+  const {
+    days,
+    alerts,
+    alertCountForDate,
+    aqiForDate,
+    error,
+    isLoading,
+    forecastUpdatedAt,
+    revalidate,
+  } = useWeatherData(location);
 
   useEffect(() => {
     if (error) {
@@ -50,39 +54,8 @@ function ShareForecastView(props: { location: Location }) {
     }
   }, [error]);
 
-  const dailyForecast = useMemo(() => {
-    try {
-      const timeseries = data?.properties?.timeseries ?? [];
-      return buildDailyForecast(
-        timeseries as Array<{ time: string; data: unknown }>,
-        location.timezone,
-        forecastDays,
-      );
-    } catch {
-      return [];
-    }
-  }, [data, forecastDays, location.timezone]);
-  const alerts: WeatherAlert[] = useMemo(
-    () => parseWeatherAlerts(alertsData),
-    [alertsData],
-  );
-  const uvMaxByDate = useMemo(() => {
-    const map = new Map<string, number>();
-    if (uvData?.hourly?.time && uvData?.hourly?.uv_index) {
-      for (let i = 0; i < uvData.hourly.time.length; i++) {
-        const time = uvData.hourly.time[i];
-        const uv = uvData.hourly.uv_index[i];
-        if (time && uv !== undefined) {
-          const dateKey = time.slice(0, 10);
-          const current = map.get(dateKey);
-          if (current === undefined || uv > current) map.set(dateKey, uv);
-        }
-      }
-    }
-    return map;
-  }, [uvData]);
   const updatedLabel = formatIsoTimeInTimezone(
-    data?.properties?.meta?.updated_at,
+    forecastUpdatedAt,
     location.timezone,
   );
   const markdown = [
@@ -96,13 +69,13 @@ function ShareForecastView(props: { location: Location }) {
     "",
     "| Day | Summary | Temp | Rain | Wind | UV | Comfort |",
     "| --- | --- | --- | --- | --- | --- | --- |",
-    ...dailyForecast.map((day) => {
-      const maxUvIndex = uvMaxByDate.get(day.dateKey);
+    ...days.map((day) => {
+      const maxUvIndex = day.maxUvIndex;
       const comfortScore = buildComfortScore(
         day,
         maxUvIndex,
-        undefined,
-        alerts.length,
+        aqiForDate(day.dateKey),
+        alertCountForDate(day.dateKey),
       );
       return `| ${day.dayAndDate} | ${buildPersonalitySummary(
         day,
@@ -119,11 +92,15 @@ function ShareForecastView(props: { location: Location }) {
       } | ${comfortScore} |`;
     }),
   ].join("\n");
-  const compact = dailyForecast
+  const compact = days
     .slice(0, 3)
     .map((day) => {
-      const maxUvIndex = uvMaxByDate.get(day.dateKey);
-      const tags = buildDecisionTags(day, maxUvIndex, alerts.length)
+      const maxUvIndex = day.maxUvIndex;
+      const tags = buildDecisionTags(
+        day,
+        maxUvIndex,
+        alertCountForDate(day.dateKey),
+      )
         .map((tag) => tag.value)
         .join(", ");
       return `${day.label}: ${buildPersonalitySummary(
@@ -144,6 +121,7 @@ function ShareForecastView(props: { location: Location }) {
     <List
       isLoading={isLoading}
       searchBarPlaceholder={`Share forecast for ${location.name}`}
+      searchBarAccessory={dropdown}
     >
       {alerts.length > 0 && <AlertBadge alerts={alerts} />}
       <List.Section title="Share">
@@ -190,8 +168,8 @@ function ShareForecastView(props: { location: Location }) {
         />
       </List.Section>
       <List.Section title={locationSummary(location)}>
-        {dailyForecast.map((day) => {
-          const maxUvIndex = uvMaxByDate.get(day.dateKey);
+        {days.map((day) => {
+          const maxUvIndex = day.maxUvIndex;
           return (
             <List.Item
               key={day.dateKey}
@@ -230,7 +208,7 @@ function ShareForecastView(props: { location: Location }) {
                     color: colorForWind(day.avgWindSpeedMs),
                   },
                 },
-                ...(maxUvIndex !== undefined && maxUvIndex > 0
+                ...(maxUvIndex !== undefined && maxUvIndex >= 0.5
                   ? [
                       {
                         tag: {
@@ -250,7 +228,7 @@ function ShareForecastView(props: { location: Location }) {
 }
 
 export default function Command() {
-  const { location, isLoading } = useDefaultLocation();
+  const { location, isLoading, dropdown } = useLocationSwitcher();
 
   if (isLoading) {
     return <List isLoading searchBarPlaceholder="Loading share forecast" />;
@@ -282,5 +260,5 @@ export default function Command() {
     );
   }
 
-  return <ShareForecastView location={location} />;
+  return <ShareForecastView location={location} dropdown={dropdown} />;
 }

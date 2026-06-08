@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import type { Location } from "../types";
 import { MET_NO_ALERTS_API } from "../constants";
+import type { WeatherAlertsPayload } from "../utils/alerts";
 import { useCachedFetch } from "./useCachedFetch";
 
 export function useWeatherAlerts(location: Location) {
@@ -10,15 +11,5 @@ export function useWeatherAlerts(location: Location) {
     [location.latitude, location.longitude],
   );
 
-  return useCachedFetch<{
-    features?: Array<{
-      properties?: {
-        event?: string;
-        headline?: string;
-        description?: string;
-        severity?: string;
-        area?: string;
-      };
-    }>;
-  }>(url);
+  return useCachedFetch<WeatherAlertsPayload>(url);
 }

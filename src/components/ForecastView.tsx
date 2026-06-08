@@ -9,25 +9,22 @@ import {
   Toast,
 } from "@raycast/api";
 import { showFailureToast } from "@raycast/utils";
-import { useEffect, useMemo } from "react";
-import type { Location, WeatherAlert } from "../types";
+import { useEffect } from "react";
+import type { Location } from "../types";
 import { MENU_BAR_LOCATION_KEY } from "../constants";
-import { getPrefs, getForecastDays } from "../preferences";
-import {
-  useAirQuality,
-  useForecast,
-  useWeatherAlerts,
-  useUVIndex,
-} from "../hooks";
+import { getPrefs } from "../preferences";
+import { useWeatherData } from "../hooks";
 import type { useFavoriteLocations } from "../hooks/useFavoriteLocations";
 import type { useSearchHistory } from "../hooks/useSearchHistory";
 import { iconForSymbol } from "../utils/icons";
 import {
   colorForTemperature,
   colorForPrecipitation,
+  colorForProbability,
   colorForWind,
   colorForUV,
   colorForAqi,
+  comfortColor,
 } from "../utils/colors";
 import {
   formatTemperature,
@@ -40,13 +37,9 @@ import {
   buildPersonalitySummary,
   buildTrendSummary,
   formatIsoTimeInTimezone,
-  formatLocalDateTimeInTimezone,
-  formatUnixTimeInTimezone,
   getCurrentHour,
   locationSummary,
-  parseWeatherAlerts,
 } from "../utils";
-import { buildDailyForecast } from "../utils/forecast";
 import { AlertBadge } from "./AlertBadge";
 import { AirQualityView } from "./AirQualityView";
 import { DayDetailsView } from "./DayDetailsView";
@@ -63,15 +56,23 @@ export function ForecastView(props: {
   const { location, addFavorite, removeFavorite, isFavorite, addToHistory } =
     props;
   const prefs = getPrefs();
-  const forecastDays = getForecastDays();
   const {
-    data,
+    days,
+    alerts,
+    alertCountForDate,
+    currentAqi,
+    aqiForDate,
     error,
     isLoading,
     isUsingFallback,
+    isStale,
     cacheUpdatedAt,
+    forecastUpdatedAt,
+    aqiUsingFallback,
+    aqiCacheUpdatedAt,
     revalidate,
-  } = useForecast(location);
+    revalidateAqi,
+  } = useWeatherData(location);
 
   useEffect(() => {
     if (error) {
@@ -83,137 +84,31 @@ export function ForecastView(props: {
     addToHistory(location);
   }, [location.id, addToHistory]);
 
-  const { data: alertsData } = useWeatherAlerts(location);
-  const {
-    data: uvData,
-    isUsingFallback: isUvUsingFallback,
-    cacheUpdatedAt: uvCacheUpdatedAt,
-    revalidate: revalidateUv,
-  } = useUVIndex(location, forecastDays);
-  const {
-    data: airQualityData,
-    isUsingFallback: isAqiUsingFallback,
-    cacheUpdatedAt: aqiCacheUpdatedAt,
-    revalidate: revalidateAqi,
-  } = useAirQuality(location);
-
-  const alerts: WeatherAlert[] = useMemo(
-    () => parseWeatherAlerts(alertsData),
-    [alertsData],
-  );
-
-  const dailyForecast = useMemo(() => {
-    try {
-      const timeseries = data?.properties?.timeseries ?? [];
-      return buildDailyForecast(
-        timeseries as Array<{ time: string; data: unknown }>,
-        location.timezone,
-        forecastDays,
-      );
-    } catch {
-      return [];
-    }
-  }, [data, location.timezone, forecastDays]);
-
-  const currentAqi = useMemo(() => {
-    const values = airQualityData?.hourly?.us_aqi ?? [];
-    return values.find((value) => value !== undefined);
-  }, [airQualityData]);
-  const currentAqiUpdatedAt = useMemo(() => {
-    const values = airQualityData?.hourly?.us_aqi ?? [];
-    const times = airQualityData?.hourly?.time ?? [];
-    const index = values.findIndex((value) => value !== undefined);
-    return index >= 0 ? times[index] : undefined;
-  }, [airQualityData]);
-
-  // Build UV max per day
-  const uvMaxByDate = useMemo(() => {
-    const map = new Map<string, number>();
-    if (uvData?.hourly?.time && uvData?.hourly?.uv_index) {
-      for (let i = 0; i < uvData.hourly.time.length; i++) {
-        const time = uvData.hourly.time[i];
-        const uv = uvData.hourly.uv_index[i];
-        if (time && uv !== undefined) {
-          const dateKey = time.slice(0, 10);
-          const current = map.get(dateKey);
-          if (current === undefined || uv > current) {
-            map.set(dateKey, uv);
-          }
-        }
-      }
-    }
-    return map;
-  }, [uvData]);
-
-  const uvByDateHour = useMemo(() => {
-    const map = new Map<string, number>();
-    if (uvData?.hourly?.time && uvData?.hourly?.uv_index) {
-      for (let i = 0; i < uvData.hourly.time.length; i++) {
-        const time = uvData.hourly.time[i];
-        const uv = uvData.hourly.uv_index[i];
-        if (time && uv !== undefined) {
-          const dateKey = time.slice(0, 10);
-          const hour = parseInt(time.slice(11, 13), 10);
-          map.set(`${dateKey}-${hour}`, uv);
-        }
-      }
-    }
-    return map;
-  }, [uvData]);
-
-  const currentDay = dailyForecast[0];
+  const currentDay = days[0];
   const currentHour = currentDay ? getCurrentHour(currentDay) : undefined;
-  const currentUv =
-    currentDay && currentHour
-      ? uvByDateHour.get(`${currentDay.dateKey}-${currentHour.hour}`)
-      : undefined;
-  const currentUvUpdatedAt =
-    currentDay && currentHour
-      ? uvData?.hourly?.time?.find((time) => {
-          if (!time) return false;
-          const hour = parseInt(time.slice(11, 13), 10);
-          return (
-            time.startsWith(currentDay.dateKey) && hour === currentHour.hour
-          );
-        })
-      : undefined;
+  const currentUv = currentHour?.uvIndex;
+  const todayAlertCount = currentDay
+    ? alertCountForDate(currentDay.dateKey)
+    : alerts.length;
   const currentComfort =
     currentDay !== undefined
-      ? buildComfortScore(currentDay, currentUv, currentAqi, alerts.length)
+      ? buildComfortScore(currentDay, currentUv, currentAqi, todayAlertCount)
       : undefined;
-  const currentComfortColor =
-    currentComfort === undefined
-      ? Color.SecondaryText
-      : currentComfort >= 75
-        ? Color.Green
-        : currentComfort >= 50
-          ? Color.Yellow
-          : Color.Red;
   const updatedLabel = formatIsoTimeInTimezone(
-    data?.properties?.meta?.updated_at,
+    forecastUpdatedAt,
     location.timezone,
   );
   const forecastFreshnessLabel = isUsingFallback
-    ? `Cached fetch ${formatIsoTimeInTimezone(cacheUpdatedAt, location.timezone)}`
+    ? `Cached fetch ${formatIsoTimeInTimezone(cacheUpdatedAt, location.timezone)}${
+        isStale ? " (stale)" : ""
+      }`
     : `Forecast ${updatedLabel}`;
-  const aqiFreshnessLabel = isAqiUsingFallback
+  const aqiFreshnessLabel = aqiUsingFallback
     ? `Cached fetch ${formatIsoTimeInTimezone(
         aqiCacheUpdatedAt,
         location.timezone,
       )}`
-    : `AQI sample ${formatUnixTimeInTimezone(
-        currentAqiUpdatedAt,
-        location.timezone,
-      )}`;
-  const uvFreshnessLabel = isUvUsingFallback
-    ? `Cached fetch ${formatIsoTimeInTimezone(
-        uvCacheUpdatedAt,
-        location.timezone,
-      )}`
-    : `UV sample ${formatLocalDateTimeInTimezone(
-        currentUvUpdatedAt,
-        location.timezone,
-      )}`;
+    : "Live sample";
 
   const favoriteAction = isFavorite(location.id) ? (
     <Action
@@ -258,7 +153,7 @@ export function ForecastView(props: {
                     {
                       tag: {
                         value: `Comfort ${currentComfort}`,
-                        color: currentComfortColor,
+                        color: comfortColor(currentComfort),
                       },
                     },
                   ]
@@ -272,6 +167,20 @@ export function ForecastView(props: {
                   color: colorForPrecipitation(currentHour.precipitationMm),
                 },
               },
+              ...(currentHour.precipitationProbabilityPct !== undefined
+                ? [
+                    {
+                      tag: {
+                        value: `${Math.round(
+                          currentHour.precipitationProbabilityPct,
+                        )}%`,
+                        color: colorForProbability(
+                          currentHour.precipitationProbabilityPct,
+                        ),
+                      },
+                    },
+                  ]
+                : []),
               {
                 text: formatWindSpeed(
                   currentHour.windSpeedMs,
@@ -291,7 +200,7 @@ export function ForecastView(props: {
                     },
                   ]
                 : []),
-              ...(currentUv !== undefined && currentUv > 0
+              ...(currentUv !== undefined && currentUv >= 0.5
                 ? [
                     {
                       tag: {
@@ -301,14 +210,14 @@ export function ForecastView(props: {
                     },
                   ]
                 : []),
-              ...(alerts.length > 0
+              ...(todayAlertCount > 0
                 ? [
                     {
                       tag: {
                         value:
-                          alerts.length === 1
+                          todayAlertCount === 1
                             ? "1 alert"
-                            : `${alerts.length} alerts`,
+                            : `${todayAlertCount} alerts`,
                         color: Color.Red,
                       },
                     },
@@ -331,7 +240,7 @@ export function ForecastView(props: {
                   day={currentDay}
                   maxUvIndex={currentUv}
                   aqi={currentAqi}
-                  alertCount={alerts.length}
+                  alertCount={todayAlertCount}
                 />
                 {favoriteAction}
                 <CommonActions />
@@ -373,21 +282,6 @@ export function ForecastView(props: {
               </ActionPanel>
             }
           />
-          <List.Item
-            title="UV"
-            subtitle={uvFreshnessLabel}
-            icon={Icon.Sun}
-            actions={
-              <ActionPanel>
-                <Action
-                  title="Refresh UV"
-                  icon={Icon.ArrowClockwise}
-                  onAction={revalidateUv}
-                />
-                <CommonActions />
-              </ActionPanel>
-            }
-          />
         </List.Section>
       ) : null}
       <List.Section title="Quick Actions">
@@ -406,7 +300,7 @@ export function ForecastView(props: {
           }
         />
       </List.Section>
-      {dailyForecast.length === 0 ? (
+      {days.length === 0 ? (
         <List.EmptyView
           title="No forecast yet"
           description="Try refreshing the weather data."
@@ -416,30 +310,26 @@ export function ForecastView(props: {
           title={locationSummary(location)}
           subtitle={`${location.latitude.toFixed(2)}, ${location.longitude.toFixed(2)}`}
         >
-          {dailyForecast.map((day, index) => {
-            const maxUvIndex = uvMaxByDate.get(day.dateKey);
+          {days.map((day, index) => {
+            const maxUvIndex = day.maxUvIndex;
+            const dayAqi = aqiForDate(day.dateKey);
+            const dayAlertCount = alertCountForDate(day.dateKey);
             const trendSummary = buildTrendSummary(
               day,
-              dailyForecast[index - 1],
-              dailyForecast[index + 1],
+              days[index - 1],
+              days[index + 1],
             );
             const personalitySummary = buildPersonalitySummary(day, maxUvIndex);
             const comfortScore = buildComfortScore(
               day,
               maxUvIndex,
-              currentAqi,
-              alerts.length,
+              dayAqi,
+              dayAlertCount,
             );
-            const comfortColor =
-              comfortScore >= 75
-                ? Color.Green
-                : comfortScore >= 50
-                  ? Color.Yellow
-                  : Color.Red;
             const decisionTags = buildDecisionTags(
               day,
               maxUvIndex,
-              alerts.length,
+              dayAlertCount,
             );
             const copyLine = `${locationSummary(location)} - ${day.dayAndDate}: ${day.condition}, ${formatTemperatureRange(
               day.minTempC,
@@ -452,7 +342,7 @@ export function ForecastView(props: {
               {
                 tag: {
                   value: `Comfort ${comfortScore}`,
-                  color: comfortColor,
+                  color: comfortColor(comfortScore),
                 },
               },
               {
@@ -487,7 +377,7 @@ export function ForecastView(props: {
                     },
                   ]
                 : []),
-              ...(maxUvIndex !== undefined && maxUvIndex > 0
+              ...(maxUvIndex !== undefined && maxUvIndex >= 0.5
                 ? [
                     {
                       tag: {
@@ -540,8 +430,8 @@ export function ForecastView(props: {
                     <ShouldIActions
                       day={day}
                       maxUvIndex={maxUvIndex}
-                      aqi={currentAqi}
-                      alertCount={alerts.length}
+                      aqi={dayAqi}
+                      alertCount={dayAlertCount}
                     />
                     {favoriteAction}
                     <Action

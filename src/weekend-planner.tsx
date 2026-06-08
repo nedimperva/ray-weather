@@ -1,7 +1,6 @@
 import {
   Action,
   ActionPanel,
-  Color,
   Icon,
   LaunchType,
   List,
@@ -9,22 +8,20 @@ import {
 } from "@raycast/api";
 import { showFailureToast } from "@raycast/utils";
 import { useEffect, useMemo } from "react";
-import type { DailyForecast, Location, WeatherAlert } from "./types";
-import {
-  useDefaultLocation,
-  useForecast,
-  useUVIndex,
-  useWeatherAlerts,
-} from "./hooks";
-import { getForecastDays, getPrefs } from "./preferences";
+
+import type { DailyForecast, Location } from "./types";
+import { MAX_FORECAST_DAYS } from "./constants";
+import { useLocationSwitcher, useWeatherData } from "./hooks";
+import type { SearchBarDropdown } from "./hooks";
+import { getPrefs } from "./preferences";
 import { AlertBadge, CommonActions } from "./components";
-import { buildDailyForecast } from "./utils/forecast";
 import { iconForSymbol } from "./utils/icons";
 import {
   colorForPrecipitation,
   colorForTemperature,
   colorForUV,
   colorForWind,
+  comfortColor,
 } from "./utils/colors";
 import {
   buildComfortScore,
@@ -33,16 +30,9 @@ import {
   dateFromDateKey,
   formatIsoTimeInTimezone,
   locationSummary,
-  parseWeatherAlerts,
 } from "./utils";
 import { formatTemperatureRange } from "./utils/temperature";
 import { formatPrecipitation, formatWindSpeed } from "./utils/units";
-
-function scoreColor(score: number): Color {
-  if (score >= 75) return Color.Green;
-  if (score >= 50) return Color.Yellow;
-  return Color.Red;
-}
 
 function weekdayIndex(day: DailyForecast): number {
   return dateFromDateKey(day.dateKey).getUTCDay();
@@ -93,16 +83,12 @@ function reasonForPick(
 function WeekendDayRow(props: {
   day: DailyForecast;
   maxUvIndex?: number;
+  aqi?: number;
   alertCount: number;
 }) {
-  const { day, maxUvIndex, alertCount } = props;
+  const { day, maxUvIndex, aqi, alertCount } = props;
   const prefs = getPrefs();
-  const comfortScore = buildComfortScore(
-    day,
-    maxUvIndex,
-    undefined,
-    alertCount,
-  );
+  const comfortScore = buildComfortScore(day, maxUvIndex, aqi, alertCount);
   const tags = buildDecisionTags(day, maxUvIndex, alertCount);
 
   return (
@@ -122,7 +108,7 @@ function WeekendDayRow(props: {
         {
           tag: {
             value: `Comfort ${comfortScore}`,
-            color: scoreColor(comfortScore),
+            color: comfortColor(comfortScore),
           },
         },
         ...tags.slice(0, 2).map((tag) => ({ tag })),
@@ -155,13 +141,22 @@ function WeekendDayRow(props: {
   );
 }
 
-function WeekendPlannerView(props: { location: Location }) {
-  const { location } = props;
+function WeekendPlannerView(props: {
+  location: Location;
+  dropdown?: SearchBarDropdown;
+}) {
+  const { location, dropdown } = props;
   const prefs = getPrefs();
-  const forecastDays = Math.max(getForecastDays(), 10);
-  const { data, error, isLoading, revalidate } = useForecast(location);
-  const { data: alertsData } = useWeatherAlerts(location);
-  const { data: uvData } = useUVIndex(location, forecastDays);
+  const {
+    days,
+    alerts,
+    alertCountForDate,
+    aqiForDate,
+    error,
+    isLoading,
+    forecastUpdatedAt,
+    revalidate,
+  } = useWeatherData(location, { days: MAX_FORECAST_DAYS });
 
   useEffect(() => {
     if (error) {
@@ -169,64 +164,25 @@ function WeekendPlannerView(props: { location: Location }) {
     }
   }, [error]);
 
-  const dailyForecast = useMemo(() => {
-    try {
-      const timeseries = data?.properties?.timeseries ?? [];
-      return buildDailyForecast(
-        timeseries as Array<{ time: string; data: unknown }>,
-        location.timezone,
-        forecastDays,
-      );
-    } catch {
-      return [];
-    }
-  }, [data, forecastDays, location.timezone]);
-
-  const alerts: WeatherAlert[] = useMemo(
-    () => parseWeatherAlerts(alertsData),
-    [alertsData],
-  );
-
-  const maxUvByDate = useMemo(() => {
-    const map = new Map<string, number>();
-    if (uvData?.hourly?.time && uvData?.hourly?.uv_index) {
-      for (let i = 0; i < uvData.hourly.time.length; i++) {
-        const time = uvData.hourly.time[i];
-        const uv = uvData.hourly.uv_index[i];
-        if (time && uv !== undefined) {
-          const dateKey = time.slice(0, 10);
-          const current = map.get(dateKey);
-          if (current === undefined || uv > current) {
-            map.set(dateKey, uv);
-          }
-        }
-      }
-    }
-    return map;
-  }, [uvData]);
-
-  const weekendDays = useMemo(
-    () => weekendDaysFromForecast(dailyForecast),
-    [dailyForecast],
-  );
+  const weekendDays = useMemo(() => weekendDaysFromForecast(days), [days]);
   const isFallbackWeekend = weekendDays.some(
     (day) => ![0, 6].includes(weekdayIndex(day)),
   );
   const scoredWeekendDays = weekendDays.map((day) => ({
     day,
-    maxUvIndex: maxUvByDate.get(day.dateKey),
+    maxUvIndex: day.maxUvIndex,
     comfortScore: buildComfortScore(
       day,
-      maxUvByDate.get(day.dateKey),
-      undefined,
-      alerts.length,
+      day.maxUvIndex,
+      aqiForDate(day.dateKey),
+      alertCountForDate(day.dateKey),
     ),
   }));
   const [bestDay, otherDay] = [...scoredWeekendDays].sort(
     (a, b) => b.comfortScore - a.comfortScore,
   );
   const updatedLabel = formatIsoTimeInTimezone(
-    data?.properties?.meta?.updated_at,
+    forecastUpdatedAt,
     location.timezone,
   );
   const copyPlan = bestDay
@@ -242,6 +198,7 @@ function WeekendPlannerView(props: { location: Location }) {
     <List
       isLoading={isLoading}
       searchBarPlaceholder={`Weekend planner for ${location.name}`}
+      searchBarAccessory={dropdown}
     >
       {alerts.length > 0 && <AlertBadge alerts={alerts} />}
       {bestDay ? (
@@ -264,10 +221,11 @@ function WeekendPlannerView(props: { location: Location }) {
                 {
                   tag: {
                     value: `Comfort ${bestDay.comfortScore}`,
-                    color: scoreColor(bestDay.comfortScore),
+                    color: comfortColor(bestDay.comfortScore),
                   },
                 },
-                ...(bestDay.maxUvIndex !== undefined && bestDay.maxUvIndex > 0
+                ...(bestDay.maxUvIndex !== undefined &&
+                bestDay.maxUvIndex >= 0.5
                   ? [
                       {
                         tag: {
@@ -302,8 +260,9 @@ function WeekendPlannerView(props: { location: Location }) {
               <WeekendDayRow
                 key={day.dateKey}
                 day={day}
-                maxUvIndex={maxUvByDate.get(day.dateKey)}
-                alertCount={alerts.length}
+                maxUvIndex={day.maxUvIndex}
+                aqi={aqiForDate(day.dateKey)}
+                alertCount={alertCountForDate(day.dateKey)}
               />
             ))}
           </List.Section>
@@ -333,16 +292,12 @@ function WeekendPlannerView(props: { location: Location }) {
                       color: colorForWind(day.avgWindSpeedMs),
                     },
                   },
-                  ...(maxUvByDate.get(day.dateKey) !== undefined
+                  ...(day.maxUvIndex !== undefined && day.maxUvIndex >= 0.5
                     ? [
                         {
                           tag: {
-                            value: `UV ${maxUvByDate
-                              .get(day.dateKey)
-                              ?.toFixed(0)}`,
-                            color: colorForUV(
-                              maxUvByDate.get(day.dateKey) ?? 0,
-                            ),
+                            value: `UV ${day.maxUvIndex.toFixed(0)}`,
+                            color: colorForUV(day.maxUvIndex),
                           },
                         },
                       ]
@@ -353,11 +308,10 @@ function WeekendPlannerView(props: { location: Location }) {
           </List.Section>
           <List.Section title="Sources">
             <List.Item
-              title="Forecast and Alerts"
+              title="Forecast, UV, and Alerts"
               subtitle="met.no Locationforecast and MetAlerts"
               icon={Icon.Cloud}
             />
-            <List.Item title="UV" subtitle="Open-Meteo" icon={Icon.Sun} />
           </List.Section>
         </>
       ) : (
@@ -398,7 +352,7 @@ function WeekendPlannerView(props: { location: Location }) {
 }
 
 export default function Command() {
-  const { location, isLoading } = useDefaultLocation();
+  const { location, isLoading, dropdown } = useLocationSwitcher();
 
   if (isLoading) {
     return <List isLoading searchBarPlaceholder="Loading weekend planner" />;
@@ -430,5 +384,5 @@ export default function Command() {
     );
   }
 
-  return <WeekendPlannerView location={location} />;
+  return <WeekendPlannerView location={location} dropdown={dropdown} />;
 }

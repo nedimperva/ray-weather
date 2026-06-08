@@ -12,14 +12,22 @@ export function useFavoriteLocations() {
 
   const addFavorite = useCallback(
     (location: Location) => {
-      if (!favorites.find((f) => f.id === location.id)) {
-        const newFavorites = [...favorites, location].slice(0, MAX_FAVORITES);
-        setFavorites(newFavorites);
+      if (favorites.find((f) => f.id === location.id)) return;
+
+      if (favorites.length >= MAX_FAVORITES) {
         void showToast({
-          style: Toast.Style.Success,
-          title: `Added ${location.name} to favorites`,
+          style: Toast.Style.Failure,
+          title: "Favorites are full",
+          message: `Remove one to add more (limit ${MAX_FAVORITES}).`,
         });
+        return;
       }
+
+      setFavorites([...favorites, location]);
+      void showToast({
+        style: Toast.Style.Success,
+        title: `Added ${location.name} to favorites`,
+      });
     },
     [favorites, setFavorites],
   );

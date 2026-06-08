@@ -32,10 +32,6 @@ export function CommonActions() {
           title="Open-Meteo Air Quality Docs"
           url="https://open-meteo.com/en/docs/air-quality-api"
         />
-        <Action.OpenInBrowser
-          title="Open-Meteo UV Docs"
-          url="https://open-meteo.com/en/docs"
-        />
       </ActionPanel.Section>
     </>
   );

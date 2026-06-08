@@ -1,6 +1,6 @@
 # Forecast Pilot for Raycast
 
-A Raycast extension for Windows that turns met.no and Open-Meteo weather data into fast, decision-first workflows.
+A Raycast extension for macOS and Windows that turns met.no and Open-Meteo weather data into fast, decision-first workflows.
 
 Instead of only showing raw forecast numbers, the extension answers practical questions:
 
@@ -17,7 +17,8 @@ Instead of only showing raw forecast numbers, the extension answers practical qu
 - Search weather by place name.
 - Save favorite locations and recent searches.
 - Pin one location for menu bar and default-command workflows.
-- View current conditions, forecast freshness, AQI, UV, alerts, rain windows, comfort scores, and decision tags.
+- View current conditions, forecast freshness, AQI, UV, alerts, rain windows, rain probability, comfort scores, and decision tags.
+- Switch the viewed location from a dropdown without re-pinning (single-location commands).
 - Compare two favorite locations.
 - Rank upcoming days by outdoor comfort.
 - Plan weekends, commutes, and travel packing.
@@ -49,7 +50,7 @@ Forecast view includes:
 - Rain window summaries
 - AQI and UV tags
 - Weather alerts
-- Data freshness for forecast, AQI, and UV
+- Data freshness for forecast and AQI
 - Air quality view
 - Day details view
 
@@ -67,7 +68,7 @@ Includes:
 - Weather alerts
 - Sunrise and sunset
 - Rain window
-- Forecast/AQI/UV freshness
+- Forecast and AQI freshness
 - Copyable weather brief
 
 ### Compare Weather
@@ -220,6 +221,8 @@ Display modes:
 - Location + temp
 - Compact icon only
 
+The menu bar icon turns into a red warning when an alert is active for the location, making it the passive/background alerting channel (the command refreshes on its interval).
+
 The menu bar dropdown includes:
 
 - Current condition
@@ -227,6 +230,9 @@ The menu bar dropdown includes:
 - Wind
 - Humidity
 - Precipitation
+- UV index
+- Active weather alerts
+- Sunrise and sunset
 - Updated time
 - Upcoming hours
 - Open full forecast
@@ -312,20 +318,21 @@ Run `Share Forecast`, then copy either:
 
 The extension uses public weather APIs:
 
-- Forecast: met.no Locationforecast API
+- Forecast, rain probability, and UV index: met.no Locationforecast `complete` API
 - Weather alerts: met.no MetAlerts API
 - Sunrise/sunset: met.no Sunrise API
 - Place search: Open-Meteo Geocoding API
 - Air quality: Open-Meteo Air Quality API
-- UV index: Open-Meteo Forecast API
+
+UV is derived from the forecast's clear-sky UV index and attenuated by the forecast cloud cover, so no separate UV request is needed.
 
 The extension includes source documentation links in the Raycast action panel.
 
 ## Data Freshness and Caching
 
-Forecast, AQI, and UV views show freshness timestamps where available.
+Forecast and AQI views show freshness timestamps where available.
 
-The shared fetch hook keeps the previous successful response in local storage. If a refresh fails and cached data exists, the extension can still show useful data and marks it as cached.
+The shared fetch hook keeps the previous successful response in local storage. If a refresh fails and cached data exists, the extension can still show useful data and marks it as cached (and `(stale)` once the cache passes its freshness window). Cached entries are pruned by age and count so local storage does not grow without bound.
 
 This improves reliability during:
 
@@ -376,12 +383,14 @@ src/
 
 Important utilities:
 
-- `buildDailyForecast`: converts met.no timeseries data into daily summaries.
+- `buildDailyForecast`: converts met.no timeseries data into daily summaries, including per-day max UV and rain probability.
 - `buildComfortScore`: calculates a 0-100 outdoor comfort score.
-- `buildDecisionTags`: creates forecast tags such as `Bring umbrella`, `Windy`, `High UV`, and `Great outside`.
+- `buildDecisionTags`: creates forecast tags such as `Rain likely`, `Windy`, `High UV`, and `Great outside`.
 - `buildShouldIDecisions`: powers umbrella, jacket, walk, and drive answers.
 - `buildPackingSuggestions`: powers the travel packing command.
-- `useCachedFetch`: wraps API calls with user-agent headers, previous data, local cache fallback, and retry support.
+- `useWeatherData`: single hook bundling forecast, alerts, and air quality, with alerts mapped to the days they cover and air quality sampled per day.
+- `useLocationSwitcher`: provides the search-bar location dropdown for single-location commands.
+- `useCachedFetch`: wraps API calls with user-agent headers, previous data, local cache fallback, staleness, and pruning.
 - `useDefaultLocation`: resolves pinned location, then first favorite.
 
 ## Development
@@ -416,7 +425,26 @@ Fix formatting and lint issues:
 npm run fix-lint
 ```
 
+Run the unit tests (Vitest) for the pure forecast, comfort, alert, and UV logic:
+
+```powershell
+npm test
+```
+
 Raycast lint validates the package schema and author online. If your environment blocks network access, package validation may fail even when TypeScript and ESLint pass.
+
+## Store Screenshots
+
+Store screenshots live in `metadata/` as `forecast-pilot-{n}.png`, sized 2000x1250 (the Raycast store spec).
+
+The current images are generated mockups of the List UI built from representative content (multiple favorite locations and active alerts) so the layout is reproducible:
+
+```bash
+pip install Pillow
+python3 scripts/render_screenshots.py
+```
+
+For a final store submission you can replace them with real captures from Raycast's built-in Window Capture (it exports at the same 2000x1250 size).
 
 ## met.no User-Agent
 
@@ -455,7 +483,7 @@ Open the relevant command and use the refresh action. If the API fails, cached f
 
 ### Air quality or UV is missing
 
-Some locations or time windows may not return complete AQI/UV data from Open-Meteo. Forecast data can still work independently.
+Some locations or time windows may not return complete air quality data from Open-Meteo, and UV is only reported during daylight. Forecast data can still work independently.
 
 ## License
 

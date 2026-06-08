@@ -8,25 +8,42 @@ import {
 import { calculateFeelsLikeC, toFahrenheit } from "./temperature";
 import { conditionLabelForSymbol } from "./formatting";
 import { dayLabelFromIndex } from "./formatting";
+import { adjustUvForClouds } from "./uv";
+
+type PrecipWindow = {
+  details?: {
+    precipitation_amount?: number;
+    probability_of_precipitation?: number;
+  };
+};
 
 function precipitationFromData(data: {
-  next_1_hours?: { details?: { precipitation_amount?: number } };
-  next_6_hours?: { details?: { precipitation_amount?: number } };
-  next_12_hours?: { details?: { precipitation_amount?: number } };
-}): { amountMm: number; windowHours: 1 | 6 | 12 } {
-  const next1 = data.next_1_hours?.details?.precipitation_amount;
-  if (typeof next1 === "number") {
-    return { amountMm: next1, windowHours: 1 };
-  }
+  next_1_hours?: PrecipWindow;
+  next_6_hours?: PrecipWindow;
+  next_12_hours?: PrecipWindow;
+}): {
+  amountMm: number;
+  windowHours: 1 | 6 | 12;
+  probabilityPct?: number;
+} {
+  const windows: Array<{
+    window: PrecipWindow | undefined;
+    hours: 1 | 6 | 12;
+  }> = [
+    { window: data.next_1_hours, hours: 1 },
+    { window: data.next_6_hours, hours: 6 },
+    { window: data.next_12_hours, hours: 12 },
+  ];
 
-  const next6 = data.next_6_hours?.details?.precipitation_amount;
-  if (typeof next6 === "number") {
-    return { amountMm: next6, windowHours: 6 };
-  }
-
-  const next12 = data.next_12_hours?.details?.precipitation_amount;
-  if (typeof next12 === "number") {
-    return { amountMm: next12, windowHours: 12 };
+  for (const { window, hours } of windows) {
+    const amount = window?.details?.precipitation_amount;
+    if (typeof amount === "number") {
+      return {
+        amountMm: amount,
+        windowHours: hours,
+        probabilityPct: window?.details?.probability_of_precipitation,
+      };
+    }
   }
 
   return { amountMm: 0, windowHours: 1 };
@@ -89,8 +106,6 @@ export function buildDailyForecast(
       pressureCount: number;
       fogCoverageTotal: number;
       fogCoverageCount: number;
-      uvIndexTotal: number;
-      uvIndexCount: number;
       hourly: HourlyForecast[];
       pressures: number[];
     }
@@ -128,8 +143,11 @@ export function buildDailyForecast(
     const dayKey = dateKeyInTimezone(date, safeTimeZone);
     const hour = localHourInTimezone(date, safeTimeZone);
     const localTimeLabel = timeLabelFormatter.format(date);
-    const { amountMm: precipitation, windowHours } =
-      precipitationFromData(data);
+    const {
+      amountMm: precipitation,
+      windowHours,
+      probabilityPct: precipitationProbability,
+    } = precipitationFromData(data);
     const symbol = symbolFromData(data);
     const windSpeed = data.instant?.details?.wind_speed as number | undefined;
     const windDirection = data.instant?.details?.wind_from_direction as
@@ -147,6 +165,16 @@ export function buildDailyForecast(
     const fogCoverage = data.instant?.details?.fog_area_fraction as
       | number
       | undefined;
+    const cloudCoverage = data.instant?.details?.cloud_area_fraction as
+      | number
+      | undefined;
+    const dewPoint = data.instant?.details?.dew_point_temperature as
+      | number
+      | undefined;
+    const uvClearSky = data.instant?.details?.ultraviolet_index_clear_sky as
+      | number
+      | undefined;
+    const uvIndex = adjustUvForClouds(uvClearSky, cloudCoverage);
     const feelsLikeC = calculateFeelsLikeC(tempC, windSpeed, humidity);
 
     if (!groupedByDay.has(dayKey)) {
@@ -167,8 +195,6 @@ export function buildDailyForecast(
         pressureCount: 0,
         fogCoverageTotal: 0,
         fogCoverageCount: 0,
-        uvIndexTotal: 0,
-        uvIndexCount: 0,
         hourly: [],
         pressures: [],
       });
@@ -211,6 +237,7 @@ export function buildDailyForecast(
       hour,
       temperatureC: tempC,
       precipitationMm: precipitation,
+      precipitationProbabilityPct: precipitationProbability,
       precipitationWindowHours: windowHours,
       windSpeedMs: windSpeed,
       windDirectionDeg: windDirection,
@@ -221,6 +248,9 @@ export function buildDailyForecast(
       symbolCode: symbol,
       condition: conditionLabelForSymbol(symbol),
       fogCoveragePct: fogCoverage,
+      cloudCoveragePct: cloudCoverage,
+      dewPointC: dewPoint,
+      uvIndex,
     });
   }
 
@@ -265,6 +295,15 @@ export function buildDailyForecast(
       current.fogCoverageCount > 0
         ? current.fogCoverageTotal / current.fogCoverageCount
         : undefined;
+    const uvValues = sortedHourly
+      .map((entry) => entry.uvIndex)
+      .filter((value): value is number => value !== undefined);
+    const maxUvIndex = uvValues.length > 0 ? Math.max(...uvValues) : undefined;
+    const probabilityValues = sortedHourly
+      .map((entry) => entry.precipitationProbabilityPct)
+      .filter((value): value is number => value !== undefined);
+    const maxPrecipitationProbabilityPct =
+      probabilityValues.length > 0 ? Math.max(...probabilityValues) : undefined;
 
     let pressureTrend: "rising" | "falling" | "stable" = "stable";
     if (current.pressures.length >= 3) {
@@ -304,6 +343,8 @@ export function buildDailyForecast(
       avgPressureHpa,
       pressureTrend,
       avgFogCoveragePct,
+      maxUvIndex,
+      maxPrecipitationProbabilityPct,
       rainWindowSummary: buildRainWindowSummary(sortedHourly),
       hourly: sortedHourly,
     };

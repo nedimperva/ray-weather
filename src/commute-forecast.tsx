@@ -8,33 +8,20 @@ import {
   launchCommand,
 } from "@raycast/api";
 import { showFailureToast } from "@raycast/utils";
-import { useEffect, useMemo } from "react";
-import type {
-  DailyForecast,
-  HourlyForecast,
-  Location,
-  WeatherAlert,
-} from "./types";
-import {
-  useDefaultLocation,
-  useForecast,
-  useUVIndex,
-  useWeatherAlerts,
-} from "./hooks";
-import { getCommuteHours, getForecastDays, getPrefs } from "./preferences";
+import { useEffect } from "react";
+
+import type { DailyForecast, HourlyForecast, Location } from "./types";
+import { useLocationSwitcher, useWeatherData } from "./hooks";
+import type { SearchBarDropdown } from "./hooks";
+import { getCommuteHours, getPrefs } from "./preferences";
 import { AlertBadge, CommonActions, ShouldIActions } from "./components";
-import { buildDailyForecast } from "./utils/forecast";
 import {
   colorForPrecipitation,
   colorForTemperature,
   colorForUV,
   colorForWind,
 } from "./utils/colors";
-import {
-  formatIsoTimeInTimezone,
-  locationSummary,
-  parseWeatherAlerts,
-} from "./utils";
+import { formatIsoTimeInTimezone, locationSummary } from "./utils";
 import { formatTemperature } from "./utils/temperature";
 import { formatPrecipitation, formatWindSpeed } from "./utils/units";
 
@@ -87,7 +74,6 @@ function buildCommuteWindow(
   day: DailyForecast,
   startHour: number,
   endHour: number,
-  maxUvByHour: Map<number, number>,
   alertCount: number,
 ): CommuteWindow {
   const hours = hoursInWindow(day, startHour, endHour);
@@ -101,10 +87,7 @@ function buildCommuteWindow(
       : undefined;
   const avgFeelsLikeC = average(hours.map((hour) => hour.feelsLikeC));
   const avgTempC = average(hours.map((hour) => hour.temperatureC));
-  const maxUvIndex = Math.max(
-    0,
-    ...hours.map((hour) => maxUvByHour.get(hour.hour) ?? 0),
-  );
+  const maxUvIndex = Math.max(0, ...hours.map((hour) => hour.uvIndex ?? 0));
   const fogRisk = (day.avgFogCoveragePct ?? 0) >= 30;
 
   let riskLevel: CommuteWindow["riskLevel"] = "low";
@@ -221,7 +204,7 @@ function CommuteWindowRow(props: {
           },
         },
         ...(commuteWindow.maxUvIndex !== undefined &&
-        commuteWindow.maxUvIndex > 0
+        commuteWindow.maxUvIndex >= 0.5
           ? [
               {
                 tag: {
@@ -246,12 +229,20 @@ function CommuteWindowRow(props: {
   );
 }
 
-function CommuteForecastView(props: { location: Location }) {
-  const { location } = props;
-  const forecastDays = getForecastDays();
-  const { data, error, isLoading, revalidate } = useForecast(location);
-  const { data: alertsData } = useWeatherAlerts(location);
-  const { data: uvData } = useUVIndex(location, forecastDays);
+function CommuteForecastView(props: {
+  location: Location;
+  dropdown?: SearchBarDropdown;
+}) {
+  const { location, dropdown } = props;
+  const {
+    today,
+    alerts,
+    alertCountForDate,
+    error,
+    isLoading,
+    forecastUpdatedAt,
+    revalidate,
+  } = useWeatherData(location);
   const commuteHours = getCommuteHours();
 
   useEffect(() => {
@@ -262,41 +253,7 @@ function CommuteForecastView(props: { location: Location }) {
     }
   }, [error]);
 
-  const dailyForecast = useMemo(() => {
-    try {
-      const timeseries = data?.properties?.timeseries ?? [];
-      return buildDailyForecast(
-        timeseries as Array<{ time: string; data: unknown }>,
-        location.timezone,
-        forecastDays,
-      );
-    } catch {
-      return [];
-    }
-  }, [data, forecastDays, location.timezone]);
-
-  const alerts: WeatherAlert[] = useMemo(
-    () => parseWeatherAlerts(alertsData),
-    [alertsData],
-  );
-  const today = dailyForecast[0];
-
-  const maxUvByHour = useMemo(() => {
-    const map = new Map<number, number>();
-    if (!today || !uvData?.hourly?.time || !uvData.hourly.uv_index) return map;
-
-    for (let i = 0; i < uvData.hourly.time.length; i++) {
-      const time = uvData.hourly.time[i];
-      const uv = uvData.hourly.uv_index[i];
-      if (time?.startsWith(today.dateKey) && uv !== undefined) {
-        const hour = Number.parseInt(time.slice(11, 13), 10);
-        const current = map.get(hour);
-        if (current === undefined || uv > current) map.set(hour, uv);
-      }
-    }
-    return map;
-  }, [today, uvData]);
-
+  const todayAlertCount = today ? alertCountForDate(today.dateKey) : 0;
   const commuteWindows = today
     ? [
         buildCommuteWindow(
@@ -305,8 +262,7 @@ function CommuteForecastView(props: { location: Location }) {
           today,
           commuteHours.morningStart,
           commuteHours.morningEnd,
-          maxUvByHour,
-          alerts.length,
+          todayAlertCount,
         ),
         buildCommuteWindow(
           "evening",
@@ -314,8 +270,7 @@ function CommuteForecastView(props: { location: Location }) {
           today,
           commuteHours.eveningStart,
           commuteHours.eveningEnd,
-          maxUvByHour,
-          alerts.length,
+          todayAlertCount,
         ),
       ]
     : [];
@@ -324,7 +279,7 @@ function CommuteForecastView(props: { location: Location }) {
     return rank[b.riskLevel] - rank[a.riskLevel];
   })[0];
   const updatedLabel = formatIsoTimeInTimezone(
-    data?.properties?.meta?.updated_at,
+    forecastUpdatedAt,
     location.timezone,
   );
 
@@ -332,6 +287,7 @@ function CommuteForecastView(props: { location: Location }) {
     <List
       isLoading={isLoading}
       searchBarPlaceholder={`Commute forecast for ${location.name}`}
+      searchBarAccessory={dropdown}
     >
       {alerts.length > 0 && <AlertBadge alerts={alerts} />}
       {today && riskiestWindow ? (
@@ -364,7 +320,7 @@ function CommuteForecastView(props: { location: Location }) {
                     icon={Icon.ArrowClockwise}
                     onAction={revalidate}
                   />
-                  <ShouldIActions day={today} alertCount={alerts.length} />
+                  <ShouldIActions day={today} alertCount={todayAlertCount} />
                   <CommonActions />
                 </ActionPanel>
               }
@@ -376,7 +332,7 @@ function CommuteForecastView(props: { location: Location }) {
                 key={commuteWindow.id}
                 commuteWindow={commuteWindow}
                 day={today}
-                alertCount={alerts.length}
+                alertCount={todayAlertCount}
               />
             ))}
           </List.Section>
@@ -386,7 +342,6 @@ function CommuteForecastView(props: { location: Location }) {
               subtitle="met.no Locationforecast and MetAlerts"
               icon={Icon.Cloud}
             />
-            <List.Item title="UV" subtitle="Open-Meteo" icon={Icon.Sun} />
           </List.Section>
         </>
       ) : (
@@ -410,7 +365,7 @@ function CommuteForecastView(props: { location: Location }) {
 }
 
 export default function Command() {
-  const { location, isLoading } = useDefaultLocation();
+  const { location, isLoading, dropdown } = useLocationSwitcher();
 
   if (isLoading) {
     return <List isLoading searchBarPlaceholder="Loading commute forecast" />;
@@ -442,5 +397,5 @@ export default function Command() {
     );
   }
 
-  return <CommuteForecastView location={location} />;
+  return <CommuteForecastView location={location} dropdown={dropdown} />;
 }

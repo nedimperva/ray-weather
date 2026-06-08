@@ -11,6 +11,7 @@
   "license": "MIT",
   "version": "1.1.0",
   "platforms": [
+    "macOS",
     "Windows"
   ],
   "commands": [
@@ -91,8 +92,14 @@
       "required": false,
       "default": "celsius",
       "data": [
-        { "title": "Celsius (\u00b0C)", "value": "celsius" },
-        { "title": "Fahrenheit (\u00b0F)", "value": "fahrenheit" }
+        {
+          "title": "Celsius (°C)",
+          "value": "celsius"
+        },
+        {
+          "title": "Fahrenheit (°F)",
+          "value": "fahrenheit"
+        }
       ]
     },
     {
@@ -103,10 +110,22 @@
       "required": false,
       "default": "ms",
       "data": [
-        { "title": "m/s", "value": "ms" },
-        { "title": "km/h", "value": "kmh" },
-        { "title": "mph", "value": "mph" },
-        { "title": "Knots", "value": "knots" }
+        {
+          "title": "m/s",
+          "value": "ms"
+        },
+        {
+          "title": "km/h",
+          "value": "kmh"
+        },
+        {
+          "title": "mph",
+          "value": "mph"
+        },
+        {
+          "title": "Knots",
+          "value": "knots"
+        }
       ]
     },
     {
@@ -117,8 +136,14 @@
       "required": false,
       "default": "mm",
       "data": [
-        { "title": "Millimeters (mm)", "value": "mm" },
-        { "title": "Inches (in)", "value": "inches" }
+        {
+          "title": "Millimeters (mm)",
+          "value": "mm"
+        },
+        {
+          "title": "Inches (in)",
+          "value": "inches"
+        }
       ]
     },
     {
@@ -129,10 +154,22 @@
       "required": false,
       "default": "10",
       "data": [
-        { "title": "3 days", "value": "3" },
-        { "title": "5 days", "value": "5" },
-        { "title": "7 days", "value": "7" },
-        { "title": "10 days", "value": "10" }
+        {
+          "title": "3 days",
+          "value": "3"
+        },
+        {
+          "title": "5 days",
+          "value": "5"
+        },
+        {
+          "title": "7 days",
+          "value": "7"
+        },
+        {
+          "title": "10 days",
+          "value": "10"
+        }
       ]
     },
     {
@@ -143,12 +180,30 @@
       "required": false,
       "default": "temp-condition",
       "data": [
-        { "title": "Temp only", "value": "temp-only" },
-        { "title": "Temp + condition", "value": "temp-condition" },
-        { "title": "Temp + rain", "value": "temp-rain" },
-        { "title": "Feels like", "value": "feels-like" },
-        { "title": "Location + temp", "value": "location-temp" },
-        { "title": "Compact icon only", "value": "compact" }
+        {
+          "title": "Temp only",
+          "value": "temp-only"
+        },
+        {
+          "title": "Temp + condition",
+          "value": "temp-condition"
+        },
+        {
+          "title": "Temp + rain",
+          "value": "temp-rain"
+        },
+        {
+          "title": "Feels like",
+          "value": "feels-like"
+        },
+        {
+          "title": "Location + temp",
+          "value": "location-temp"
+        },
+        {
+          "title": "Compact icon only",
+          "value": "compact"
+        }
       ]
     },
     {
@@ -159,12 +214,30 @@
       "required": false,
       "default": "7",
       "data": [
-        { "title": "5:00", "value": "5" },
-        { "title": "6:00", "value": "6" },
-        { "title": "7:00", "value": "7" },
-        { "title": "8:00", "value": "8" },
-        { "title": "9:00", "value": "9" },
-        { "title": "10:00", "value": "10" }
+        {
+          "title": "5:00",
+          "value": "5"
+        },
+        {
+          "title": "6:00",
+          "value": "6"
+        },
+        {
+          "title": "7:00",
+          "value": "7"
+        },
+        {
+          "title": "8:00",
+          "value": "8"
+        },
+        {
+          "title": "9:00",
+          "value": "9"
+        },
+        {
+          "title": "10:00",
+          "value": "10"
+        }
       ]
     },
     {
@@ -175,12 +248,30 @@
       "required": false,
       "default": "9",
       "data": [
-        { "title": "6:00", "value": "6" },
-        { "title": "7:00", "value": "7" },
-        { "title": "8:00", "value": "8" },
-        { "title": "9:00", "value": "9" },
-        { "title": "10:00", "value": "10" },
-        { "title": "11:00", "value": "11" }
+        {
+          "title": "6:00",
+          "value": "6"
+        },
+        {
+          "title": "7:00",
+          "value": "7"
+        },
+        {
+          "title": "8:00",
+          "value": "8"
+        },
+        {
+          "title": "9:00",
+          "value": "9"
+        },
+        {
+          "title": "10:00",
+          "value": "10"
+        },
+        {
+          "title": "11:00",
+          "value": "11"
+        }
       ]
     },
     {
@@ -191,12 +282,30 @@
       "required": false,
       "default": "16",
       "data": [
-        { "title": "14:00", "value": "14" },
-        { "title": "15:00", "value": "15" },
-        { "title": "16:00", "value": "16" },
-        { "title": "17:00", "value": "17" },
-        { "title": "18:00", "value": "18" },
-        { "title": "19:00", "value": "19" }
+        {
+          "title": "14:00",
+          "value": "14"
+        },
+        {
+          "title": "15:00",
+          "value": "15"
+        },
+        {
+          "title": "16:00",
+          "value": "16"
+        },
+        {
+          "title": "17:00",
+          "value": "17"
+        },
+        {
+          "title": "18:00",
+          "value": "18"
+        },
+        {
+          "title": "19:00",
+          "value": "19"
+        }
       ]
     },
     {
@@ -207,12 +316,30 @@
       "required": false,
       "default": "18",
       "data": [
-        { "title": "15:00", "value": "15" },
-        { "title": "16:00", "value": "16" },
-        { "title": "17:00", "value": "17" },
-        { "title": "18:00", "value": "18" },
-        { "title": "19:00", "value": "19" },
-        { "title": "20:00", "value": "20" }
+        {
+          "title": "15:00",
+          "value": "15"
+        },
+        {
+          "title": "16:00",
+          "value": "16"
+        },
+        {
+          "title": "17:00",
+          "value": "17"
+        },
+        {
+          "title": "18:00",
+          "value": "18"
+        },
+        {
+          "title": "19:00",
+          "value": "19"
+        },
+        {
+          "title": "20:00",
+          "value": "20"
+        }
       ]
     }
   ],
@@ -220,7 +347,8 @@
     "build": "ray build -e dist",
     "dev": "ray develop",
     "lint": "ray lint",
-    "fix-lint": "ray lint --fix"
+    "fix-lint": "ray lint --fix",
+    "test": "vitest run"
   },
   "dependencies": {
     "@raycast/api": "^1.104.6",
@@ -232,6 +360,7 @@
     "@types/react": "19.0.10",
     "eslint": "^9.21.0",
     "prettier": "^3.5.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9"
   }
 }

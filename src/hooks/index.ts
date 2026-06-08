@@ -9,4 +9,6 @@ export { useForecast } from "./useForecast";
 export { useSunEvents } from "./useSunEvents";
 export { useAirQuality } from "./useAirQuality";
 export { useWeatherAlerts } from "./useWeatherAlerts";
-export { useUVIndex } from "./useUVIndex";
+export { useWeatherData } from "./useWeatherData";
+export { useLocationSwitcher } from "./useLocationSwitcher";
+export type { SearchBarDropdown } from "./useLocationSwitcher";

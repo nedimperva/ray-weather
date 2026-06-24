@@ -15,15 +15,7 @@ import type { SearchBarDropdown } from "./hooks";
 import { getPrefs } from "./preferences";
 import { AlertBadge, CommonActions, ShouldIActions } from "./components";
 import { iconForSymbol } from "./utils/icons";
-import {
-  colorForAqi,
-  colorForPrecipitation,
-  colorForProbability,
-  colorForTemperature,
-  colorForUV,
-  colorForWind,
-  comfortColor,
-} from "./utils/colors";
+import { colorForTemperature, comfortColor } from "./utils/colors";
 import {
   buildComfortScore,
   buildDecisionTags,
@@ -86,6 +78,9 @@ function BriefView(props: {
   const decisionTags = today
     ? buildDecisionTags(today, currentUv, todayAlertCount)
     : [];
+  const primaryDecisionTag =
+    decisionTags.find((tag) => !tag.value.startsWith("Rain after ")) ??
+    decisionTags[0];
   const updatedLabel = formatIsoTimeInTimezone(
     forecastUpdatedAt,
     location.timezone,
@@ -109,6 +104,34 @@ function BriefView(props: {
     sunData?.properties?.sunset?.time,
     location.timezone,
   );
+  const briefDetailParts =
+    today && currentHour
+      ? [
+          buildPersonalitySummary(today, currentUv),
+          `feels like ${formatTemperature(
+            currentHour.feelsLikeC,
+            prefs.temperatureUnit,
+          )}`,
+          `rain ${formatPrecipitation(
+            currentHour.precipitationMm,
+            prefs.precipitationUnit,
+          )}`,
+          currentHour.precipitationProbabilityPct !== undefined
+            ? `${Math.round(currentHour.precipitationProbabilityPct)}% chance`
+            : undefined,
+          currentHour.windSpeedMs !== undefined
+            ? `wind ${formatWindSpeed(
+                currentHour.windSpeedMs,
+                prefs.windSpeedUnit,
+              )}`
+            : undefined,
+          currentAqi !== undefined ? `AQI ${currentAqi}` : undefined,
+          currentUv !== undefined && currentUv >= 0.5
+            ? `UV ${currentUv.toFixed(0)}`
+            : undefined,
+          `updated ${updatedLabel}`,
+        ].filter(Boolean)
+      : [];
 
   const copyBrief =
     today && currentHour
@@ -139,13 +162,7 @@ function BriefView(props: {
                 currentHour.temperatureC,
                 prefs.temperatureUnit,
               )} - ${currentHour.condition}`}
-              subtitle={`${buildPersonalitySummary(
-                today,
-                currentUv,
-              )} - feels like ${formatTemperature(
-                currentHour.feelsLikeC,
-                prefs.temperatureUnit,
-              )} - updated ${updatedLabel}`}
+              subtitle={briefDetailParts.join(" - ")}
               icon={{
                 source: iconForSymbol(currentHour.symbolCode),
                 tintColor: colorForTemperature(currentHour.temperatureC),
@@ -161,62 +178,7 @@ function BriefView(props: {
                       },
                     ]
                   : []),
-                {
-                  tag: {
-                    value: `Rain ${formatPrecipitation(
-                      currentHour.precipitationMm,
-                      prefs.precipitationUnit,
-                    )}`,
-                    color: colorForPrecipitation(currentHour.precipitationMm),
-                  },
-                },
-                ...(currentHour.precipitationProbabilityPct !== undefined
-                  ? [
-                      {
-                        tag: {
-                          value: `${Math.round(
-                            currentHour.precipitationProbabilityPct,
-                          )}%`,
-                          color: colorForProbability(
-                            currentHour.precipitationProbabilityPct,
-                          ),
-                        },
-                      },
-                    ]
-                  : []),
-                ...(currentHour.windSpeedMs !== undefined
-                  ? [
-                      {
-                        tag: {
-                          value: formatWindSpeed(
-                            currentHour.windSpeedMs,
-                            prefs.windSpeedUnit,
-                          ),
-                          color: colorForWind(currentHour.windSpeedMs),
-                        },
-                      },
-                    ]
-                  : []),
-                ...(currentAqi !== undefined
-                  ? [
-                      {
-                        tag: {
-                          value: `AQI ${currentAqi}`,
-                          color: colorForAqi(currentAqi),
-                        },
-                      },
-                    ]
-                  : []),
-                ...(currentUv !== undefined && currentUv >= 0.5
-                  ? [
-                      {
-                        tag: {
-                          value: `UV ${currentUv.toFixed(0)}`,
-                          color: colorForUV(currentUv),
-                        },
-                      },
-                    ]
-                  : []),
+                ...(primaryDecisionTag ? [{ tag: primaryDecisionTag }] : []),
               ]}
               actions={
                 <ActionPanel>
@@ -245,7 +207,9 @@ function BriefView(props: {
               title="Today's Calls"
               subtitle={decisionTags.map((tag) => tag.value).join(" - ")}
               icon={Icon.CheckCircle}
-              accessories={decisionTags.map((tag) => ({ tag }))}
+              accessories={
+                primaryDecisionTag ? [{ tag: primaryDecisionTag }] : []
+              }
               actions={
                 <ActionPanel>
                   <Action.CopyToClipboard

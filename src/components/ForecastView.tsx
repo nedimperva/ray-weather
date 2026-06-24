@@ -1,7 +1,6 @@
 import {
   Action,
   ActionPanel,
-  Color,
   Icon,
   List,
   LocalStorage,
@@ -17,15 +16,7 @@ import { useWeatherData } from "../hooks";
 import type { useFavoriteLocations } from "../hooks/useFavoriteLocations";
 import type { useSearchHistory } from "../hooks/useSearchHistory";
 import { iconForSymbol } from "../utils/icons";
-import {
-  colorForTemperature,
-  colorForPrecipitation,
-  colorForProbability,
-  colorForWind,
-  colorForUV,
-  colorForAqi,
-  comfortColor,
-} from "../utils/colors";
+import { colorForTemperature, comfortColor } from "../utils/colors";
 import {
   formatTemperature,
   formatTemperatureRange,
@@ -94,6 +85,12 @@ export function ForecastView(props: {
     currentDay !== undefined
       ? buildComfortScore(currentDay, currentUv, currentAqi, todayAlertCount)
       : undefined;
+  const currentDecisionTags = currentDay
+    ? buildDecisionTags(currentDay, currentUv, todayAlertCount)
+    : [];
+  const currentPrimaryTag =
+    currentDecisionTags.find((tag) => !tag.value.startsWith("Rain after ")) ??
+    currentDecisionTags[0];
   const updatedLabel = formatIsoTimeInTimezone(
     forecastUpdatedAt,
     location.timezone,
@@ -109,6 +106,42 @@ export function ForecastView(props: {
         location.timezone,
       )}`
     : "Live sample";
+  const nowDetailParts =
+    currentDay && currentHour
+      ? [
+          buildPersonalitySummary(currentDay, currentUv),
+          `feels like ${formatTemperature(
+            currentHour.feelsLikeC,
+            prefs.temperatureUnit,
+          )}`,
+          `rain ${formatPrecipitation(
+            currentHour.precipitationMm,
+            prefs.precipitationUnit,
+          )}`,
+          currentHour.precipitationProbabilityPct !== undefined
+            ? `${Math.round(currentHour.precipitationProbabilityPct)}% chance`
+            : undefined,
+          currentHour.windSpeedMs !== undefined
+            ? `wind ${formatWindSpeed(
+                currentHour.windSpeedMs,
+                prefs.windSpeedUnit,
+              )}`
+            : undefined,
+          currentHour.humidityPct !== undefined
+            ? `${Math.round(currentHour.humidityPct)}% humidity`
+            : undefined,
+          currentAqi !== undefined ? `AQI ${currentAqi}` : undefined,
+          currentUv !== undefined && currentUv >= 0.5
+            ? `UV ${currentUv.toFixed(0)}`
+            : undefined,
+          todayAlertCount > 0
+            ? todayAlertCount === 1
+              ? "1 alert"
+              : `${todayAlertCount} alerts`
+            : undefined,
+          `updated ${updatedLabel}`,
+        ].filter(Boolean)
+      : [];
 
   const favoriteAction = isFavorite(location.id) ? (
     <Action
@@ -136,13 +169,7 @@ export function ForecastView(props: {
               currentHour.temperatureC,
               prefs.temperatureUnit,
             )} - ${currentHour.condition}`}
-            subtitle={`${buildPersonalitySummary(
-              currentDay,
-              currentUv,
-            )} - feels like ${formatTemperature(
-              currentHour.feelsLikeC,
-              prefs.temperatureUnit,
-            )} - updated ${updatedLabel}`}
+            subtitle={nowDetailParts.join(" - ")}
             icon={{
               source: iconForSymbol(currentHour.symbolCode),
               tintColor: colorForTemperature(currentHour.temperatureC),
@@ -158,71 +185,7 @@ export function ForecastView(props: {
                     },
                   ]
                 : []),
-              {
-                tag: {
-                  value: `Rain ${formatPrecipitation(
-                    currentHour.precipitationMm,
-                    prefs.precipitationUnit,
-                  )}`,
-                  color: colorForPrecipitation(currentHour.precipitationMm),
-                },
-              },
-              ...(currentHour.precipitationProbabilityPct !== undefined
-                ? [
-                    {
-                      tag: {
-                        value: `${Math.round(
-                          currentHour.precipitationProbabilityPct,
-                        )}%`,
-                        color: colorForProbability(
-                          currentHour.precipitationProbabilityPct,
-                        ),
-                      },
-                    },
-                  ]
-                : []),
-              {
-                text: formatWindSpeed(
-                  currentHour.windSpeedMs,
-                  prefs.windSpeedUnit,
-                ),
-              },
-              ...(currentHour.humidityPct !== undefined
-                ? [{ text: `${Math.round(currentHour.humidityPct)}% humidity` }]
-                : []),
-              ...(currentAqi !== undefined
-                ? [
-                    {
-                      tag: {
-                        value: `AQI ${currentAqi}`,
-                        color: colorForAqi(currentAqi),
-                      },
-                    },
-                  ]
-                : []),
-              ...(currentUv !== undefined && currentUv >= 0.5
-                ? [
-                    {
-                      tag: {
-                        value: `UV ${currentUv.toFixed(0)}`,
-                        color: colorForUV(currentUv),
-                      },
-                    },
-                  ]
-                : []),
-              ...(todayAlertCount > 0
-                ? [
-                    {
-                      tag: {
-                        value:
-                          todayAlertCount === 1
-                            ? "1 alert"
-                            : `${todayAlertCount} alerts`,
-                        color: Color.Red,
-                      },
-                    },
-                  ]
-                : []),
+              ...(currentPrimaryTag ? [{ tag: currentPrimaryTag }] : []),
             ]}
             actions={
               <ActionPanel>
@@ -331,6 +294,39 @@ export function ForecastView(props: {
               maxUvIndex,
               dayAlertCount,
             );
+            const primaryDecisionTag =
+              decisionTags.find(
+                (tag) => !tag.value.startsWith("Rain after "),
+              ) ?? decisionTags[0];
+            const temperatureRange = formatTemperatureRange(
+              day.minTempC,
+              day.maxTempC,
+              prefs.temperatureUnit,
+            );
+            const detailParts = [
+              personalitySummary,
+              trendSummary,
+              day.rainWindowSummary,
+              `rain ${formatPrecipitation(
+                day.precipitationMm,
+                prefs.precipitationUnit,
+              )}`,
+              day.avgWindSpeedMs !== undefined
+                ? `wind ${formatWindSpeed(
+                    day.avgWindSpeedMs,
+                    prefs.windSpeedUnit,
+                  )}`
+                : undefined,
+              maxUvIndex !== undefined && maxUvIndex >= 0.5
+                ? `UV ${maxUvIndex.toFixed(0)}`
+                : undefined,
+              dayAqi !== undefined ? `AQI ${dayAqi}` : undefined,
+              dayAlertCount > 0
+                ? dayAlertCount === 1
+                  ? "1 alert"
+                  : `${dayAlertCount} alerts`
+                : undefined,
+            ].filter(Boolean);
             const copyLine = `${locationSummary(location)} - ${day.dayAndDate}: ${day.condition}, ${formatTemperatureRange(
               day.minTempC,
               day.maxTempC,
@@ -338,55 +334,13 @@ export function ForecastView(props: {
             )}, ${formatPrecipitation(day.precipitationMm, prefs.precipitationUnit)} precipitation`;
 
             const dayAccessories = [
-              ...decisionTags.map((tag) => ({ tag })),
               {
                 tag: {
                   value: `Comfort ${comfortScore}`,
                   color: comfortColor(comfortScore),
                 },
               },
-              {
-                tag: {
-                  value: formatTemperatureRange(
-                    day.minTempC,
-                    day.maxTempC,
-                    prefs.temperatureUnit,
-                  ),
-                  color: colorForTemperature(day.maxTempC),
-                },
-              },
-              {
-                tag: {
-                  value: formatPrecipitation(
-                    day.precipitationMm,
-                    prefs.precipitationUnit,
-                  ),
-                  color: colorForPrecipitation(day.precipitationMm),
-                },
-              },
-              ...(day.avgWindSpeedMs !== undefined
-                ? [
-                    {
-                      tag: {
-                        value: formatWindSpeed(
-                          day.avgWindSpeedMs,
-                          prefs.windSpeedUnit,
-                        ),
-                        color: colorForWind(day.avgWindSpeedMs),
-                      },
-                    },
-                  ]
-                : []),
-              ...(maxUvIndex !== undefined && maxUvIndex >= 0.5
-                ? [
-                    {
-                      tag: {
-                        value: `UV ${maxUvIndex.toFixed(0)}`,
-                        color: colorForUV(maxUvIndex),
-                      },
-                    },
-                  ]
-                : []),
+              ...(primaryDecisionTag ? [{ tag: primaryDecisionTag }] : []),
             ];
 
             return (
@@ -396,14 +350,8 @@ export function ForecastView(props: {
                   source: iconForSymbol(day.symbolCode),
                   tintColor: colorForTemperature(day.maxTempC),
                 }}
-                title={`${day.label} (${day.shortDate})`}
-                subtitle={[
-                  personalitySummary,
-                  trendSummary,
-                  day.rainWindowSummary,
-                ]
-                  .filter(Boolean)
-                  .join(" - ")}
+                title={`${day.label} (${day.shortDate}) - ${temperatureRange}`}
+                subtitle={detailParts.join(" - ")}
                 accessories={dayAccessories}
                 actions={
                   <ActionPanel>

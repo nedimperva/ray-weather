@@ -16,12 +16,7 @@ import { getPrefs } from "./preferences";
 import { AlertBadge, CommonActions } from "./components";
 import { CopyWeekendPlanImageAction } from "./components/CopyWeekendPlanImageAction";
 import { iconForSymbol } from "./utils/icons";
-import {
-  colorForPrecipitation,
-  colorForTemperature,
-  colorForUV,
-  colorForWind,
-} from "./utils/colors";
+import { colorForTemperature } from "./utils/colors";
 import {
   buildComfortScore,
   buildDecisionTags,
@@ -221,55 +216,38 @@ function ShareForecastView(props: {
       <List.Section title={locationSummary(location)}>
         {days.map((day) => {
           const maxUvIndex = day.maxUvIndex;
+          const temperatureRange = formatTemperatureRange(
+            day.minTempC,
+            day.maxTempC,
+            prefs.temperatureUnit,
+          );
           return (
             <List.Item
               key={day.dateKey}
-              title={day.dayAndDate}
-              subtitle={buildPersonalitySummary(day, maxUvIndex)}
+              title={`${day.dayAndDate} - ${temperatureRange}`}
+              subtitle={[
+                buildPersonalitySummary(day, maxUvIndex),
+                day.rainWindowSummary,
+                `rain ${formatPrecipitation(
+                  day.precipitationMm,
+                  prefs.precipitationUnit,
+                )}`,
+                day.avgWindSpeedMs !== undefined
+                  ? `wind ${formatWindSpeed(
+                      day.avgWindSpeedMs,
+                      prefs.windSpeedUnit,
+                    )}`
+                  : undefined,
+                maxUvIndex !== undefined && maxUvIndex >= 0.5
+                  ? `UV ${maxUvIndex.toFixed(0)}`
+                  : undefined,
+              ]
+                .filter(Boolean)
+                .join(" - ")}
               icon={{
                 source: iconForSymbol(day.symbolCode),
                 tintColor: colorForTemperature(day.maxTempC),
               }}
-              accessories={[
-                {
-                  tag: {
-                    value: formatTemperatureRange(
-                      day.minTempC,
-                      day.maxTempC,
-                      prefs.temperatureUnit,
-                    ),
-                    color: colorForTemperature(day.maxTempC),
-                  },
-                },
-                {
-                  tag: {
-                    value: formatPrecipitation(
-                      day.precipitationMm,
-                      prefs.precipitationUnit,
-                    ),
-                    color: colorForPrecipitation(day.precipitationMm),
-                  },
-                },
-                {
-                  tag: {
-                    value: formatWindSpeed(
-                      day.avgWindSpeedMs,
-                      prefs.windSpeedUnit,
-                    ),
-                    color: colorForWind(day.avgWindSpeedMs),
-                  },
-                },
-                ...(maxUvIndex !== undefined && maxUvIndex >= 0.5
-                  ? [
-                      {
-                        tag: {
-                          value: `UV ${maxUvIndex.toFixed(0)}`,
-                          color: colorForUV(maxUvIndex),
-                        },
-                      },
-                    ]
-                  : []),
-              ]}
             />
           );
         })}

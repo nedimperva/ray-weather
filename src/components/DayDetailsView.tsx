@@ -5,11 +5,7 @@ import type { Location, DailyForecast, WeatherAlert } from "../types";
 import { getPrefs } from "../preferences";
 import { useSunEvents } from "../hooks";
 import { iconForSymbol } from "../utils/icons";
-import {
-  colorForProbability,
-  colorForTemperature,
-  colorForUV,
-} from "../utils/colors";
+import { colorForTemperature } from "../utils/colors";
 import {
   formatTemperature,
   formatTemperatureRange,
@@ -69,26 +65,22 @@ export function DayDetailsView(props: {
       <List.Section title={`${locationSummary(location)} - ${day.dayAndDate}`}>
         <List.Item
           title="Summary"
-          subtitle={day.condition}
+          subtitle={[
+            day.condition,
+            formatTemperatureRange(
+              day.minTempC,
+              day.maxTempC,
+              prefs.temperatureUnit,
+            ),
+            `rain ${formatPrecipitation(
+              day.precipitationMm,
+              prefs.precipitationUnit,
+            )}`,
+          ].join(" - ")}
           icon={{
             source: iconForSymbol(day.symbolCode),
             tintColor: colorForTemperature(day.maxTempC),
           }}
-          accessories={[
-            {
-              text: formatTemperatureRange(
-                day.minTempC,
-                day.maxTempC,
-                prefs.temperatureUnit,
-              ),
-            },
-            {
-              text: formatPrecipitation(
-                day.precipitationMm,
-                prefs.precipitationUnit,
-              ),
-            },
-          ]}
           actions={
             <ActionPanel>
               <CommonActions />
@@ -214,70 +206,42 @@ export function DayDetailsView(props: {
                     source: iconForSymbol(hour.symbolCode),
                     tintColor: colorForTemperature(hour.temperatureC),
                   }}
-                  title={hour.localTimeLabel}
-                  subtitle={hour.condition}
-                  accessories={[
-                    {
-                      text: formatTemperature(
-                        hour.temperatureC,
-                        prefs.temperatureUnit,
-                      ),
-                    },
-                    {
-                      text: formatPrecipitation(
-                        hour.precipitationMm,
-                        prefs.precipitationUnit,
-                      ),
-                    },
-                    ...(hour.precipitationProbabilityPct !== undefined
-                      ? [
-                          {
-                            tag: {
-                              value: `${Math.round(
-                                hour.precipitationProbabilityPct,
-                              )}%`,
-                              color: colorForProbability(
-                                hour.precipitationProbabilityPct,
-                              ),
-                            },
-                          },
-                        ]
-                      : []),
-                    {
-                      text: [
-                        formatWindSpeed(hour.windSpeedMs, prefs.windSpeedUnit),
-                        windDirection,
-                      ]
-                        .filter(Boolean)
-                        .join(" "),
-                    },
-                    ...(hour.windGustMs !== undefined
-                      ? [
-                          {
-                            text: `Gust ${formatWindSpeed(
-                              hour.windGustMs,
-                              prefs.windSpeedUnit,
-                            )}`,
-                          },
-                        ]
-                      : []),
-                    {
-                      text:
-                        hour.humidityPct !== undefined
-                          ? `${Math.round(hour.humidityPct)}%`
-                          : "-",
-                    },
-                    ...(uvIndex !== undefined && uvIndex >= 0.5
-                      ? [
-                          {
-                            tag: {
-                              value: `UV ${uvIndex.toFixed(0)}`,
-                              color: colorForUV(uvIndex),
-                            },
-                          },
-                        ]
-                      : []),
-                  ]}
+                  title={`${hour.localTimeLabel} - ${formatTemperature(
+                    hour.temperatureC,
+                    prefs.temperatureUnit,
+                  )}`}
+                  subtitle={[
+                    hour.condition,
+                    `rain ${formatPrecipitation(
+                      hour.precipitationMm,
+                      prefs.precipitationUnit,
+                    )}`,
+                    hour.precipitationProbabilityPct !== undefined
+                      ? `${Math.round(
+                          hour.precipitationProbabilityPct,
+                        )}% chance`
+                      : undefined,
+                    [
+                      formatWindSpeed(hour.windSpeedMs, prefs.windSpeedUnit),
+                      windDirection,
+                    ]
+                      .filter(Boolean)
+                      .join(" "),
+                    hour.windGustMs !== undefined
+                      ? `gust ${formatWindSpeed(
+                          hour.windGustMs,
+                          prefs.windSpeedUnit,
+                        )}`
+                      : undefined,
+                    hour.humidityPct !== undefined
+                      ? `${Math.round(hour.humidityPct)}% humidity`
+                      : undefined,
+                    uvIndex !== undefined && uvIndex >= 0.5
+                      ? `UV ${uvIndex.toFixed(0)}`
+                      : undefined,
+                  ]
+                    .filter(Boolean)
+                    .join(" - ")}
                   actions={
                     <ActionPanel>
                       <CommonActions />

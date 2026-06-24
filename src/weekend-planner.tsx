@@ -46,10 +46,17 @@ function WeekendDayRow(props: {
   const prefs = getPrefs();
   const comfortScore = buildComfortScore(day, maxUvIndex, aqi, alertCount);
   const tags = buildDecisionTags(day, maxUvIndex, alertCount);
+  const temperatureRange = formatTemperatureRange(
+    day.minTempC,
+    day.maxTempC,
+    prefs.temperatureUnit,
+  );
+  const primaryTag =
+    tags.find((tag) => !tag.value.startsWith("Rain after ")) ?? tags[0];
 
   return (
     <List.Item
-      title={day.dayAndDate}
+      title={`${day.dayAndDate} - ${temperatureRange}`}
       subtitle={[
         buildPersonalitySummary(day, maxUvIndex),
         day.rainWindowSummary,
@@ -67,17 +74,7 @@ function WeekendDayRow(props: {
             color: comfortColor(comfortScore),
           },
         },
-        ...tags.slice(0, 2).map((tag) => ({ tag })),
-        {
-          tag: {
-            value: formatTemperatureRange(
-              day.minTempC,
-              day.maxTempC,
-              prefs.temperatureUnit,
-            ),
-            color: colorForTemperature(day.maxTempC),
-          },
-        },
+        ...(primaryTag ? [{ tag: primaryTag }] : []),
       ]}
       actions={
         <ActionPanel>

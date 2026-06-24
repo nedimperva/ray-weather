@@ -15,12 +15,6 @@ import { useLocationSwitcher, useWeatherData } from "./hooks";
 import type { SearchBarDropdown } from "./hooks";
 import { getCommuteHours, getPrefs } from "./preferences";
 import { AlertBadge, CommonActions, ShouldIActions } from "./components";
-import {
-  colorForPrecipitation,
-  colorForTemperature,
-  colorForUV,
-  colorForWind,
-} from "./utils/colors";
 import { formatIsoTimeInTimezone, locationSummary } from "./utils";
 import { formatTemperature } from "./utils/temperature";
 import { formatPrecipitation, formatWindSpeed } from "./utils/units";
@@ -156,11 +150,33 @@ function CommuteWindowRow(props: {
     commuteWindow.precipitationMm,
     prefs.precipitationUnit,
   )}.`;
+  const detailParts = [
+    commuteWindow.recommendation,
+    commuteWindow.reason,
+    label,
+    commuteWindow.avgFeelsLikeC !== undefined
+      ? `feels ${formatTemperature(
+          commuteWindow.avgFeelsLikeC,
+          prefs.temperatureUnit,
+        )}`
+      : undefined,
+    `rain ${formatPrecipitation(
+      commuteWindow.precipitationMm,
+      prefs.precipitationUnit,
+    )}`,
+    `wind ${formatWindSpeed(
+      commuteWindow.maxWindSpeedMs,
+      prefs.windSpeedUnit,
+    )}`,
+    commuteWindow.maxUvIndex !== undefined && commuteWindow.maxUvIndex >= 0.5
+      ? `UV ${commuteWindow.maxUvIndex.toFixed(0)}`
+      : undefined,
+  ].filter(Boolean);
 
   return (
     <List.Item
       title={`${commuteWindow.title} Commute`}
-      subtitle={`${commuteWindow.recommendation} - ${commuteWindow.reason} - ${label}`}
+      subtitle={detailParts.join(" - ")}
       icon={{
         source: commuteWindow.riskLevel === "low" ? Icon.Car : Icon.Warning,
         tintColor: riskColor(commuteWindow.riskLevel),
@@ -172,48 +188,6 @@ function CommuteWindowRow(props: {
             color: riskColor(commuteWindow.riskLevel),
           },
         },
-        ...(commuteWindow.avgFeelsLikeC !== undefined
-          ? [
-              {
-                tag: {
-                  value: `Feels ${formatTemperature(
-                    commuteWindow.avgFeelsLikeC,
-                    prefs.temperatureUnit,
-                  )}`,
-                  color: colorForTemperature(commuteWindow.avgFeelsLikeC),
-                },
-              },
-            ]
-          : []),
-        {
-          tag: {
-            value: formatPrecipitation(
-              commuteWindow.precipitationMm,
-              prefs.precipitationUnit,
-            ),
-            color: colorForPrecipitation(commuteWindow.precipitationMm),
-          },
-        },
-        {
-          tag: {
-            value: formatWindSpeed(
-              commuteWindow.maxWindSpeedMs,
-              prefs.windSpeedUnit,
-            ),
-            color: colorForWind(commuteWindow.maxWindSpeedMs),
-          },
-        },
-        ...(commuteWindow.maxUvIndex !== undefined &&
-        commuteWindow.maxUvIndex >= 0.5
-          ? [
-              {
-                tag: {
-                  value: `UV ${commuteWindow.maxUvIndex.toFixed(0)}`,
-                  color: colorForUV(commuteWindow.maxUvIndex),
-                },
-              },
-            ]
-          : []),
       ]}
       actions={
         <ActionPanel>

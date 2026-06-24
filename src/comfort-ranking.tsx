@@ -15,14 +15,7 @@ import type { SearchBarDropdown } from "./hooks";
 import { getPrefs } from "./preferences";
 import { AlertBadge, CommonActions, ShouldIActions } from "./components";
 import { iconForSymbol } from "./utils/icons";
-import {
-  colorForAqi,
-  colorForPrecipitation,
-  colorForTemperature,
-  colorForUV,
-  colorForWind,
-  comfortColor,
-} from "./utils/colors";
+import { colorForTemperature, comfortColor } from "./utils/colors";
 import {
   buildComfortScore,
   buildDecisionTags,
@@ -31,7 +24,6 @@ import {
   locationSummary,
 } from "./utils";
 import { formatTemperatureRange } from "./utils/temperature";
-import { formatPrecipitation, formatWindSpeed } from "./utils/units";
 
 function rankLabel(index: number): string {
   if (index === 0) return "Best";
@@ -169,16 +161,27 @@ function ComfortRankingView(props: {
                 ranked.maxUvIndex,
                 alertCountForDate(ranked.day.dateKey),
               );
+              const temperatureRange = formatTemperatureRange(
+                ranked.day.minTempC,
+                ranked.day.maxTempC,
+                prefs.temperatureUnit,
+              );
+              const primaryTag =
+                tags.find((tag) => !tag.value.startsWith("Rain after ")) ??
+                tags[0];
+              const detailParts = [
+                buildPersonalitySummary(ranked.day, ranked.maxUvIndex),
+                ranked.day.rainWindowSummary,
+                ranked.maxUvIndex !== undefined && ranked.maxUvIndex >= 0.5
+                  ? `UV ${ranked.maxUvIndex.toFixed(0)}`
+                  : undefined,
+                dayAqi !== undefined ? `AQI ${dayAqi}` : undefined,
+              ].filter(Boolean);
               return (
                 <List.Item
                   key={ranked.day.dateKey}
-                  title={`${rankLabel(index)} - ${ranked.day.dayAndDate}`}
-                  subtitle={[
-                    buildPersonalitySummary(ranked.day, ranked.maxUvIndex),
-                    ranked.day.rainWindowSummary,
-                  ]
-                    .filter(Boolean)
-                    .join(" - ")}
+                  title={`${rankLabel(index)} - ${ranked.day.dayAndDate} - ${temperatureRange}`}
+                  subtitle={detailParts.join(" - ")}
                   icon={{
                     source: iconForSymbol(ranked.day.symbolCode),
                     tintColor: colorForTemperature(ranked.day.maxTempC),
@@ -190,58 +193,7 @@ function ComfortRankingView(props: {
                         color: comfortColor(ranked.comfortScore),
                       },
                     },
-                    ...tags.slice(0, 2).map((tag) => ({ tag })),
-                    {
-                      tag: {
-                        value: formatTemperatureRange(
-                          ranked.day.minTempC,
-                          ranked.day.maxTempC,
-                          prefs.temperatureUnit,
-                        ),
-                        color: colorForTemperature(ranked.day.maxTempC),
-                      },
-                    },
-                    {
-                      tag: {
-                        value: formatPrecipitation(
-                          ranked.day.precipitationMm,
-                          prefs.precipitationUnit,
-                        ),
-                        color: colorForPrecipitation(
-                          ranked.day.precipitationMm,
-                        ),
-                      },
-                    },
-                    {
-                      tag: {
-                        value: formatWindSpeed(
-                          ranked.day.avgWindSpeedMs,
-                          prefs.windSpeedUnit,
-                        ),
-                        color: colorForWind(ranked.day.avgWindSpeedMs),
-                      },
-                    },
-                    ...(ranked.maxUvIndex !== undefined &&
-                    ranked.maxUvIndex >= 0.5
-                      ? [
-                          {
-                            tag: {
-                              value: `UV ${ranked.maxUvIndex.toFixed(0)}`,
-                              color: colorForUV(ranked.maxUvIndex),
-                            },
-                          },
-                        ]
-                      : []),
-                    ...(dayAqi !== undefined
-                      ? [
-                          {
-                            tag: {
-                              value: `AQI ${dayAqi}`,
-                              color: colorForAqi(dayAqi),
-                            },
-                          },
-                        ]
-                      : []),
+                    ...(primaryTag ? [{ tag: primaryTag }] : []),
                   ]}
                   actions={
                     <ActionPanel>

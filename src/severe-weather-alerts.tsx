@@ -76,7 +76,9 @@ function AlertLocationSection(props: {
           <List.Item
             key={`${location.id}-${alert.event}-${index}`}
             title={alert.event}
-            subtitle={alert.headline || alert.description || alert.area}
+            subtitle={[alert.headline || alert.description, alert.area]
+              .filter(Boolean)
+              .join(" - ")}
             icon={{
               source: Icon.Warning,
               tintColor: severityColors[alert.severity],
@@ -88,7 +90,6 @@ function AlertLocationSection(props: {
                   color: severityColors[alert.severity],
                 },
               },
-              ...(alert.area ? [{ text: alert.area }] : []),
             ]}
             actions={
               <ActionPanel>

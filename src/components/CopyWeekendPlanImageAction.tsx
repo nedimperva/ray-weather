@@ -4,12 +4,12 @@ import {
   Icon,
   Toast,
   environment,
-  showInFinder,
   showToast,
 } from "@raycast/api";
 import { mkdir, writeFile } from "fs/promises";
 import { join } from "path";
 
+import { revealFile } from "../utils/revealFile";
 import {
   buildWeekendShareImageFilename,
   renderWeekendSharePng,
@@ -39,7 +39,7 @@ async function copyWeekendPlanImage(input: WeekendShareImageInput) {
     toast.primaryAction = {
       title: "Show Image",
       onAction: () => {
-        void showInFinder(filePath);
+        void revealFile(filePath);
       },
     };
   } catch (error) {

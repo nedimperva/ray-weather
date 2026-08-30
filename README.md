@@ -485,6 +485,31 @@ Open the relevant command and use the refresh action. If the API fails, cached f
 
 Some locations or time windows may not return complete air quality data from Open-Meteo, and UV is only reported during daylight. Forecast data can still work independently.
 
+## Running on Linux (Vicinae)
+
+Forecast Pilot also runs on [Vicinae](https://vicinae.com), a Raycast-compatible
+launcher for Linux. Vicinae serves its own implementation of `@raycast/api` at
+runtime, so the extension needs no source changes — only a different build step:
+
+```bash
+npm install
+npm run build:vicinae
+```
+
+`vici build` compiles straight into `~/.local/share/vicinae/extensions/forecast-pilot`,
+so building is installing. Restart the server to pick up a new extension:
+
+```bash
+systemctl --user restart vicinae.service
+```
+
+Two platform notes:
+
+- **Menu Bar Weather** does not appear on Vicinae. `menu-bar` is a macOS concept
+  and Vicinae has no menu bar to render into. Every other command works.
+- **Reveal actions** use `showInFinder` on Raycast and `showInFileBrowser` on
+  Vicinae, resolved at runtime in `src/utils/revealFile.ts`.
+
 ## License
 
 MIT

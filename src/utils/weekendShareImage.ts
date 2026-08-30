@@ -1,3 +1,4 @@
+import { execFileSync } from "child_process";
 import { existsSync } from "fs";
 import { join } from "path";
 import { Writable } from "stream";
@@ -388,7 +389,41 @@ export function buildWeekendShareSvg(input: WeekendShareImageInput): string {
 </svg>`;
 }
 
-function findCanvasFontPath(): string | undefined {
+// Families to ask fontconfig for, in order of preference. The resolved file
+// must be TrueType because that is all pureimage can parse.
+const FONTCONFIG_FAMILIES = [
+  "DejaVu Sans",
+  "Noto Sans",
+  "Liberation Sans",
+  "Arial",
+  "sans-serif",
+];
+
+// Linux font layouts differ per distribution, so a hardcoded list can never
+// cover them all. Ask fontconfig, which every desktop Linux ships.
+function findFontsViaFontconfig(): string[] {
+  if (process.platform === "win32" || process.platform === "darwin") return [];
+
+  const found: string[] = [];
+
+  for (const family of FONTCONFIG_FAMILIES) {
+    try {
+      const file = execFileSync("fc-match", ["-f", "%{file}", family], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim();
+
+      if (file.toLowerCase().endsWith(".ttf") && existsSync(file))
+        found.push(file);
+    } catch {
+      // fontconfig is not guaranteed to be present; try the next family.
+    }
+  }
+
+  return found;
+}
+
+function collectCanvasFontCandidates(): string[] {
   const windowsFonts = process.env.WINDIR
     ? join(process.env.WINDIR, "Fonts")
     : "C:\\Windows\\Fonts";
@@ -398,21 +433,49 @@ function findCanvasFontPath(): string | undefined {
     "/System/Library/Fonts/Supplemental/Arial.ttf",
     "/System/Library/Fonts/Supplemental/Helvetica.ttf",
     "/Library/Fonts/Arial.ttf",
+    // Debian/Ubuntu
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+    // Arch
+    "/usr/share/fonts/TTF/DejaVuSans.ttf",
+    "/usr/share/fonts/liberation/LiberationSans-Regular.ttf",
+    // Fedora
+    "/usr/share/fonts/dejavu-sans-fonts/DejaVuSans.ttf",
+    "/usr/share/fonts/liberation-sans/LiberationSans-Regular.ttf",
   ];
 
-  return candidates.find((candidate) => existsSync(candidate));
+  return [...candidates.filter(existsSync), ...findFontsViaFontconfig()];
+}
+
+// Having a font file is not enough: pureimage's kerning reader throws on some
+// otherwise valid TrueType fonts (Liberation and Adwaita among them), and it
+// only fails once text is actually drawn. Draw a throwaway glyph to find out.
+function canRenderWith(fontPath: string): boolean {
+  try {
+    PImage.registerFont(fontPath, CANVAS_FONT_FAMILY).loadSync();
+
+    const probe = PImage.make(8, 8);
+    const ctx = probe.getContext("2d");
+    ctx.font = `10pt ${CANVAS_FONT_FAMILY}`;
+    ctx.fillText("Ag 1", 0, 6);
+
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function ensureCanvasFont() {
   if (canvasFontReady) return;
 
-  const fontPath = findCanvasFontPath();
-  if (!fontPath)
-    throw new Error("No supported system font found for image export");
+  for (const candidate of collectCanvasFontCandidates()) {
+    if (canRenderWith(candidate)) {
+      canvasFontReady = true;
+      return;
+    }
+  }
 
-  PImage.registerFont(fontPath, CANVAS_FONT_FAMILY).loadSync();
-  canvasFontReady = true;
+  throw new Error("No usable system font found for image export");
 }
 
 function drawRoundRect(

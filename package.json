@@ -348,7 +348,8 @@
     "dev": "ray develop",
     "lint": "ray lint",
     "fix-lint": "ray lint --fix",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:vicinae": "vici build"
   },
   "dependencies": {
     "@raycast/api": "^1.104.6",
@@ -359,6 +360,7 @@
     "@raycast/eslint-config": "^2.1.1",
     "@types/node": "22.13.10",
     "@types/react": "19.0.10",
+    "@vicinae/api": "^0.27.4",
     "eslint": "^9.21.0",
     "prettier": "^3.5.2",
     "typescript": "^5.9.3",

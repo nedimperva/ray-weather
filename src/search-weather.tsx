@@ -4,6 +4,7 @@ import {
   Color,
   Icon,
   List,
+  LaunchProps,
   LocalStorage,
   showToast,
   Toast,
@@ -24,7 +25,22 @@ import {
 import { ForecastView } from "./components";
 import { CommonActions } from "./components";
 
-export default function Command() {
+type SearchWeatherArguments = {
+  location?: string;
+};
+
+export default function Command(
+  props: LaunchProps<{ arguments: SearchWeatherArguments }>,
+) {
+  // A place can arrive from the command argument, from a deeplink's
+  // fallbackText, or from `vicinae cmd launch ... --query`. Any of them should
+  // land the user on results instead of the empty-state hint.
+  const initialQuery = (
+    props.arguments?.location ??
+    props.fallbackText ??
+    ""
+  ).trim();
+
   const {
     favorites,
     addFavorite,
@@ -35,8 +51,8 @@ export default function Command() {
     isFavorite,
   } = useFavoriteLocations();
   const { history, addToHistory, clearHistory } = useSearchHistory();
-  const [searchText, setSearchText] = useState("");
-  const [hasInteracted, setHasInteracted] = useState(false);
+  const [searchText, setSearchText] = useState(initialQuery);
+  const [hasInteracted, setHasInteracted] = useState(initialQuery.length > 0);
   const query = searchText.trim();
   const { data: places = [], isLoading, error } = usePlaceSearch(query);
 

@@ -15,6 +15,9 @@ export const MAX_AIR_QUALITY_DAYS = 7;
 export const FAVORITE_LOCATIONS_KEY = "favorite-locations";
 export const SEARCH_HISTORY_KEY = "search-history";
 export const MENU_BAR_LOCATION_KEY = "menu-bar-default-location";
+// Events the background watcher has already notified about, so a repeated run
+// stays quiet about the same alert or rain window.
+export const WATCH_SEEN_KEY = "weather-watch-seen";
 export const MAX_HISTORY_ITEMS = 10;
 export const MAX_FAVORITES = 20;
 
@@ -26,4 +29,4 @@ export const CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 export const CACHE_STALE_AFTER_MS = 6 * 60 * 60 * 1000;
 
 export const APP_USER_AGENT =
-  "forecast-pilot-raycast-extension/1.1 (https://github.com/nedimperva/ray-weather)";
+  "forecast-pilot-raycast-extension/1.2 (https://github.com/nedimperva/ray-weather)";

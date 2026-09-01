@@ -9,7 +9,7 @@
     "Other"
   ],
   "license": "MIT",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "platforms": [
     "macOS",
     "Windows"
@@ -19,7 +19,15 @@
       "name": "search-weather",
       "title": "Search Weather",
       "description": "Search locations and open a decision-first forecast",
-      "mode": "view"
+      "mode": "view",
+      "arguments": [
+        {
+          "name": "location",
+          "type": "text",
+          "placeholder": "City or place",
+          "required": false
+        }
+      ]
     },
     {
       "name": "today-weather-brief",
@@ -76,6 +84,13 @@
       "mode": "view"
     },
     {
+      "name": "weather-watch",
+      "title": "Weather Watch",
+      "description": "Refresh weather in the background, push alert notifications, and update the status file",
+      "mode": "no-view",
+      "interval": "30m"
+    },
+    {
       "name": "menu-bar-weather",
       "title": "Menu Bar Weather",
       "description": "Show current weather in the menu bar for a pinned location",
@@ -93,11 +108,11 @@
       "default": "celsius",
       "data": [
         {
-          "title": "Celsius (°C)",
+          "title": "Celsius (\u00b0C)",
           "value": "celsius"
         },
         {
-          "title": "Fahrenheit (°F)",
+          "title": "Fahrenheit (\u00b0F)",
           "value": "fahrenheit"
         }
       ]
@@ -175,8 +190,8 @@
     {
       "name": "menuBarDisplayMode",
       "type": "dropdown",
-      "title": "Menu Bar Display",
-      "description": "Choose what appears in the menu bar title",
+      "title": "Status Display",
+      "description": "What the menu bar title (macOS/Windows) and the status file text (Linux) show",
       "required": false,
       "default": "temp-condition",
       "data": [
@@ -205,6 +220,37 @@
           "value": "compact"
         }
       ]
+    },
+    {
+      "name": "alertNotifications",
+      "type": "dropdown",
+      "title": "Alert Notifications",
+      "description": "Which severe weather alerts Weather Watch notifies about (desktop notifications on Linux/Vicinae)",
+      "required": false,
+      "default": "severe",
+      "data": [
+        {
+          "title": "Severe and extreme only",
+          "value": "severe"
+        },
+        {
+          "title": "Every active alert",
+          "value": "all"
+        },
+        {
+          "title": "Off",
+          "value": "off"
+        }
+      ]
+    },
+    {
+      "name": "rainNotifications",
+      "type": "checkbox",
+      "title": "Rain Notifications",
+      "label": "Notify when rain is about to start",
+      "description": "Warn once when rain is expected to begin within 90 minutes",
+      "required": false,
+      "default": true
     },
     {
       "name": "morningCommuteStart",
@@ -349,7 +395,8 @@
     "lint": "ray lint",
     "fix-lint": "ray lint --fix",
     "test": "vitest run",
-    "build:vicinae": "vici build"
+    "build:vicinae": "node scripts/build-vicinae.mjs",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@raycast/api": "^1.104.6",

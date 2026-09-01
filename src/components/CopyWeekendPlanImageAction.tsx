@@ -1,20 +1,8 @@
-import {
-  Action,
-  Clipboard,
-  Icon,
-  Toast,
-  environment,
-  showToast,
-} from "@raycast/api";
-import { mkdir, writeFile } from "fs/promises";
-import { join } from "path";
+import { Action, Clipboard, Icon, Toast, showToast } from "@raycast/api";
 
 import { revealFile } from "../utils/revealFile";
-import {
-  buildWeekendShareImageFilename,
-  renderWeekendSharePng,
-  type WeekendShareImageInput,
-} from "../utils/weekendShareImage";
+import { writeWeekendShareImage } from "../utils/weekendImageFile";
+import type { WeekendShareImageInput } from "../utils/weekendShareImage";
 
 async function copyWeekendPlanImage(input: WeekendShareImageInput) {
   const toast = await showToast({
@@ -23,14 +11,7 @@ async function copyWeekendPlanImage(input: WeekendShareImageInput) {
   });
 
   try {
-    const imageDirectory = join(environment.supportPath, "shared-images");
-    await mkdir(imageDirectory, { recursive: true });
-
-    const filePath = join(
-      imageDirectory,
-      buildWeekendShareImageFilename(input),
-    );
-    await writeFile(filePath, await renderWeekendSharePng(input));
+    const filePath = await writeWeekendShareImage(input);
     await Clipboard.copy({ file: filePath });
 
     toast.style = Toast.Style.Success;

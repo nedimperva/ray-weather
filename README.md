@@ -1,304 +1,219 @@
-# Forecast Pilot for Raycast
+# Forecast Pilot
 
-A Raycast extension for macOS and Windows that turns met.no and Open-Meteo weather data into fast, decision-first workflows.
+Decision-first weather planning for [Raycast](https://raycast.com) on macOS and
+Windows, and for [Vicinae](https://vicinae.com) on Linux.
 
-Instead of only showing raw forecast numbers, the extension answers practical questions:
+Most weather tools show you numbers. Forecast Pilot answers questions:
 
-- What is happening now?
-- Which day is best for being outside?
-- Should I bring an umbrella or wear a jacket?
-- Which favorite location has better weather?
-- What should I pack for a short trip?
-- Is my commute likely to be affected?
-- Are there active weather alerts?
+- What is happening right now?
+- Which day this week is best for being outside?
+- Do I need an umbrella or a jacket?
+- Which of my two locations has better weather?
+- Will my commute be affected?
+- Is there anything I should be warned about?
 
-## Highlights
+Data comes from [met.no](https://api.met.no) and
+[Open-Meteo](https://open-meteo.com). No account, no API key.
 
-- Search weather by place name.
-- Save favorite locations and recent searches.
-- Pin one location for menu bar and default-command workflows.
-- View current conditions, forecast freshness, AQI, UV, alerts, rain windows, rain probability, comfort scores, and decision tags.
-- Switch the viewed location from a dropdown without re-pinning (single-location commands).
-- Compare two favorite locations.
-- Rank upcoming days by outdoor comfort.
-- Plan weekends, commutes, and travel packing.
-- Copy compact or Markdown forecast summaries.
-- Use cached forecast data when a refresh fails.
+---
+
+## Contents
+
+- [Install](#install)
+- [First run](#first-run)
+- [Commands](#commands)
+- [Platform support](#platform-support)
+- [Preferences](#preferences)
+- [Common workflows](#common-workflows)
+- [Linux integration](#linux-integration)
+- [Data sources](#data-sources)
+- [Privacy](#privacy)
+- [Troubleshooting](#troubleshooting)
+- [Development](#development)
+
+---
+
+## Install
+
+### macOS and Windows — Raycast
+
+Install from the Raycast store, or build from source:
+
+```bash
+npm install
+npm run build      # compiles and installs into Raycast
+```
+
+`npm run dev` starts Raycast's development mode with hot reload.
+
+### Linux — Vicinae
+
+Requires [Vicinae](https://docs.vicinae.com/install/linux) 0.27 or newer.
+
+```bash
+npm install
+npm run build:vicinae
+systemctl --user restart vicinae.service   # or: vicinae server --replace
+```
+
+`npm run build:vicinae` compiles straight into
+`~/.local/share/vicinae/extensions/forecast-pilot`, so building is installing.
+Vicinae picks up newly added commands after a server restart; edits to existing
+commands are picked up on the next launch.
+
+The Linux build is not just the Raycast build running elsewhere — it adds
+desktop notifications, a status file for bar widgets, CLI and deeplink launching,
+and a wallpaper action. See [Linux integration](#linux-integration).
+
+---
+
+## First run
+
+Every single-location command needs a default location. Set one once:
+
+1. Run **Search Weather**.
+2. Type a place name and pick it from the results.
+3. Open the action panel and choose **Set as Menu Bar Location**.
+
+That pinned location is used by Today's Weather Brief, Weekend Planner, Commute
+Forecast, Comfort Ranking, Travel Packing Forecast, Share Forecast, Severe
+Weather Alerts, Weather Watch, and Menu Bar Weather. If nothing is pinned, the
+first favorite is used instead.
+
+To compare locations, add at least two favorites with **Add to Favorites**.
+
+---
 
 ## Commands
 
+| Command | What it answers |
+| --- | --- |
+| **Search Weather** | Find a place and open its full forecast. Accepts a place name as an argument. |
+| **Today's Weather Brief** | A compact briefing for the default location. |
+| **Compare Weather** | Which of two favorites has better weather, and why. |
+| **Weekend Planner** | Which of Saturday and Sunday to choose. |
+| **Commute Forecast** | Whether the morning and evening commute windows are affected. |
+| **Comfort Ranking** | Which upcoming day is best for being outside. |
+| **Travel Packing Forecast** | What to pack for the days ahead. |
+| **Share Forecast** | Markdown, compact text, and image summaries to send to someone. |
+| **Severe Weather Alerts** | Active alerts for the default location and every favorite. |
+| **Manage Favorites** | Nicknames, groups, ordering, and the pinned location. |
+| **Weather Watch** | Background refresh: alert and rain notifications, plus the status file. |
+| **Menu Bar Weather** | Current conditions in the macOS menu bar. |
+
 ### Search Weather
 
-Search for a place, open its forecast, and manage common actions.
+Search by place name, then open a decision-first forecast. Favorites and recent
+searches appear when the search field is empty.
 
-Includes:
+The forecast view shows current conditions, daily rows, comfort scores, decision
+tags, rain windows, air quality, UV, active alerts, and data freshness, and it
+can drill into a per-day detail view and an air quality view.
 
-- Favorite locations
-- Recent searches
-- Location search results
-- Pin to menu bar
-- Copy coordinates
-- Add/remove favorites
-- Open full forecast
-
-Forecast view includes:
-
-- Now section
-- Daily forecast rows
-- Comfort score
-- Decision tags
-- Rain window summaries
-- AQI and UV tags
-- Weather alerts
-- Data freshness for forecast and AQI
-- Air quality view
-- Day details view
+Search Weather takes an optional `location` argument, so it can be launched
+pre-filled from a keybind, a deeplink, or the command line.
 
 ### Today's Weather Brief
 
-Shows a compact briefing for the pinned location, or the first favorite if no pinned location exists.
-
-Includes:
-
-- Current condition
-- Feels-like temperature
-- Comfort score
-- Rain now/next hour
-- AQI and UV
-- Weather alerts
-- Sunrise and sunset
-- Rain window
-- Forecast and AQI freshness
-- Copyable weather brief
+Current condition, feels-like temperature, comfort score, rain now and next
+hour, AQI, UV, alerts, sunrise and sunset, and forecast freshness — as one
+copyable briefing.
 
 ### Compare Weather
 
-Compares two favorite locations and recommends the better one.
-
-Comparison factors:
-
-- Comfort score
-- Temperature
-- Rain
-- Wind
-- AQI
-- UV
-- Alerts
-
-Use this when choosing between two places for travel, outdoor plans, errands, or weekend decisions.
+Compares two favorites on comfort score, temperature, rain, wind, AQI, UV, and
+alerts, then recommends one. Useful for travel, errands, and weekend decisions.
 
 ### Weekend Planner
 
-Finds the upcoming Saturday and Sunday for the default location and recommends the better day.
-
-Includes:
-
-- Better weekend day recommendation
-- Comfort score
-- Rain window
-- Temperature range
-- Wind
-- UV
-- Alerts
-- Copyable weekend plan
+Finds the upcoming Saturday and Sunday for the default location and recommends
+the better day, with comfort score, rain window, temperature range, wind, UV,
+and alerts. Exports a shareable image of the plan.
 
 ### Commute Forecast
 
-Summarizes morning and evening commute conditions for the default location.
-
-Includes:
-
-- Morning commute risk
-- Evening commute risk
-- Feels-like temperature
-- Rain amount
-- Wind
-- UV
-- Alert context
-- Copyable commute forecast
-
-Commute windows are configurable in extension preferences.
+Summarises morning and evening commute conditions: risk level, feels-like
+temperature, rain amount, wind, UV, and alert context. The commute windows are
+configurable in preferences.
 
 ### Comfort Ranking
 
-Ranks upcoming forecast days from best to worst for outdoor comfort.
-
-Comfort score considers:
-
-- Temperature comfort
-- Precipitation
-- Wind
-- UV
-- AQI
-- Fog coverage
-- Weather alerts
-
-Use this to pick the best day for walking, hiking, errands, or outdoor plans.
-
-### Severe Weather Alerts
-
-Shows active weather alerts for the default location and favorite locations.
-
-Includes:
-
-- Severity sorting
-- Severity colors
-- Favorite-location alert scan
-- Copy alert text
-- Copy all alerts for a location
+Ranks the upcoming forecast days from best to worst for outdoor comfort. The
+score weighs temperature comfort, precipitation, wind, UV, AQI, fog coverage,
+and active alerts.
 
 ### Travel Packing Forecast
 
-Builds a packing list from the upcoming forecast.
-
-Possible suggestions include:
-
-- Umbrella
-- Waterproof layer
-- Warm jacket
-- Light layers
-- Light clothing
-- Sunscreen
-- Sunglasses
-- Windproof layer
-- Air quality backup plan
-- Weather alert plan
-- Extra travel time
+Turns the upcoming forecast into a packing list: umbrella, waterproof layer,
+warm jacket, light layers, sunscreen, sunglasses, windproof layer, air quality
+backup plan, alert plan, and extra travel time.
 
 ### Share Forecast
 
-Creates shareable forecast summaries.
+Produces a Markdown table, a compact one-line summary, and a rendered PNG of the
+weekend plan. On Linux the PNG can also be set as the desktop wallpaper.
 
-Formats:
+### Severe Weather Alerts
 
-- Markdown table
-- Compact text summary
-
-Useful for messages, trip planning, team updates, and personal notes.
+Active alerts for the default location and every favorite, sorted and coloured
+by severity, with copyable alert text.
 
 ### Manage Favorites
 
-Organize favorite locations.
+Add nicknames (`Home`, `Work`, `Cabin`) and groups (`Home`, `Travel`,
+`Weekend`), reorder favorites, promote one to first, change the pinned location,
+and remove entries.
 
-Actions:
+### Weather Watch
 
-- Add favorites from Search Weather
-- Edit nickname
-- Edit group
-- Reorder favorites
-- Make first favorite
-- Set as menu bar location
-- Remove favorite
-- Remove all favorites
+Runs every 30 minutes in the background. Each run:
 
-Nickname examples:
+1. Refreshes the forecast and alerts for the default location.
+2. Notifies once about each new or escalated weather alert.
+3. Notifies once when rain is expected to start within 90 minutes.
+4. Writes the [status file](docs/linux.md#status-file) for bar widgets.
+5. Updates its own subtitle in the launcher's root search.
 
-- Home
-- Work
-- Cabin
-- Berlin Trip
+On Linux these are real desktop notifications, delivered whether or not the
+launcher is open. Raycast has no notification API, so there the command updates
+its subtitle instead and shows a toast when you run it by hand.
 
-Group examples:
-
-- Home
-- Work
-- Travel
-- Family
-- Weekend
+Notification behaviour is controlled by the **Alert Notifications** and **Rain
+Notifications** preferences. Setting alerts to `Off` still refreshes the status
+file — it only mutes the notification.
 
 ### Menu Bar Weather
 
-Shows weather for the pinned location in the Raycast menu bar.
+Current conditions in the menu bar, with a dropdown for feels-like, wind,
+humidity, precipitation, UV, alerts, sunrise and sunset, and the next few hours.
+The icon turns into a red warning while an alert is active.
 
-If no location is pinned, the first favorite is used.
+This command needs a menu bar to render into. Where there is none, Weather Watch
+covers the same job through notifications and the status file.
 
-Display modes:
+---
 
-- Temp only
-- Temp + condition
-- Temp + rain
-- Feels like
-- Location + temp
-- Compact icon only
+## Platform support
 
-The menu bar icon turns into a red warning when an alert is active for the location, making it the passive/background alerting channel (the command refreshes on its interval).
+| | macOS / Windows (Raycast) | Linux (Vicinae) |
+| --- | :---: | :---: |
+| All forecast, comparison, and planning commands | ✅ | ✅ |
+| Favorites, groups, pinned location, caching | ✅ | ✅ |
+| Weekend plan image, copy to clipboard | ✅ | ✅ |
+| Background refresh on an interval | ✅ | ✅ |
+| Desktop notifications for alerts and rain | ❌ | ✅ |
+| Status file for bar widgets | ❌<sup>1</sup> | ✅ |
+| Launch from the CLI, a deeplink, or a keybind | partial<sup>2</sup> | ✅ |
+| Set the weekend plan as wallpaper | ❌ | ✅ |
+| Menu bar item | ✅ macOS | ❌<sup>3</sup> |
 
-The menu bar dropdown includes:
+<sup>1</sup> The file is still written, into the extension support directory,
+but nothing consumes it there.
+<sup>2</sup> Raycast supports deeplinks but has no command-line launcher.
+<sup>3</sup> Vicinae has no menu bar; the Vicinae build omits the command
+entirely rather than shipping one that cannot render.
 
-- Current condition
-- Feels-like temperature
-- Wind
-- Humidity
-- Precipitation
-- UV index
-- Active weather alerts
-- Sunrise and sunset
-- Updated time
-- Upcoming hours
-- Open full forecast
-- Preferences
-
-## Common Workflows
-
-### Set up a default location
-
-1. Run `Search Weather`.
-2. Search for a place.
-3. Open actions.
-4. Select `Set as Menu Bar Location`.
-
-This location is used by:
-
-- Today's Weather Brief
-- Weekend Planner
-- Commute Forecast
-- Comfort Ranking
-- Travel Packing Forecast
-- Share Forecast
-- Severe Weather Alerts
-- Menu Bar Weather
-
-If no pinned location exists, the first favorite is used.
-
-### Add and organize favorites
-
-1. Run `Search Weather`.
-2. Search for a place.
-3. Select `Add to Favorites`.
-4. Run `Manage Favorites`.
-5. Add a nickname or group.
-
-### Decide what to do today
-
-Run `Today's Weather Brief` or open a forecast and use the `Should I...` actions.
-
-Supported decisions:
-
-- Should I bring an umbrella?
-- Should I wear a jacket?
-- Good time for a walk?
-- Safe to drive?
-
-### Pick the best day
-
-Run `Comfort Ranking` to rank the upcoming forecast days.
-
-Run `Weekend Planner` when you only care about Saturday/Sunday.
-
-### Compare two locations
-
-1. Add at least two favorites.
-2. Run `Compare Weather`.
-3. Pick the first location.
-4. Pick the second location.
-5. Read the recommendation and supporting metrics.
-
-### Share a forecast
-
-Run `Share Forecast`, then copy either:
-
-- Markdown Forecast
-- Compact Forecast
+---
 
 ## Preferences
 
@@ -307,208 +222,157 @@ Run `Share Forecast`, then copy either:
 | Temperature Unit | Celsius | Celsius or Fahrenheit |
 | Wind Speed Unit | m/s | m/s, km/h, mph, or knots |
 | Precipitation Unit | mm | Millimeters or inches |
-| Forecast Days | 10 | Number of forecast days to display |
-| Menu Bar Display | Temp + condition | Controls menu bar title format |
-| Morning Commute Start | 7:00 | Start hour for morning commute forecast |
-| Morning Commute End | 9:00 | End hour for morning commute forecast |
-| Evening Commute Start | 16:00 | Start hour for evening commute forecast |
-| Evening Commute End | 18:00 | End hour for evening commute forecast |
+| Forecast Days | 10 | How many forecast days to display |
+| Status Display | Temp + condition | What the menu bar title and status file text show |
+| Alert Notifications | Severe and extreme only | Which alerts Weather Watch notifies about, or `Off` |
+| Rain Notifications | On | Warn once when rain is expected within 90 minutes |
+| Morning Commute Start | 7:00 | Start of the morning commute window |
+| Morning Commute End | 9:00 | End of the morning commute window |
+| Evening Commute Start | 16:00 | Start of the evening commute window |
+| Evening Commute End | 18:00 | End of the evening commute window |
 
-## Data Sources
+---
 
-The extension uses public weather APIs:
+## Common workflows
 
-- Forecast, rain probability, and UV index: met.no Locationforecast `complete` API
-- Weather alerts: met.no MetAlerts API
-- Sunrise/sunset: met.no Sunrise API
-- Place search: Open-Meteo Geocoding API
-- Air quality: Open-Meteo Air Quality API
+**Decide what to do today.** Run Today's Weather Brief, or open a forecast and
+use the `Should I…` actions: umbrella, jacket, good time for a walk, safe to
+drive.
 
-UV is derived from the forecast's clear-sky UV index and attenuated by the forecast cloud cover, so no separate UV request is needed.
+**Pick the best day.** Comfort Ranking for the week ahead; Weekend Planner when
+only Saturday and Sunday matter.
 
-The extension includes source documentation links in the Raycast action panel.
+**Compare two places.** Add two favorites, run Compare Weather, pick both, read
+the recommendation and the metrics behind it.
 
-## Data Freshness and Caching
+**Share a forecast.** Run Share Forecast and copy the Markdown table, the
+compact summary, or the weekend image.
 
-Forecast and AQI views show freshness timestamps where available.
+**Get warned without looking.** Pin a location and let Weather Watch run. On
+Linux you get desktop notifications; everywhere you get an up-to-date subtitle
+in the launcher's root search.
 
-The shared fetch hook keeps the previous successful response in local storage. If a refresh fails and cached data exists, the extension can still show useful data and marks it as cached (and `(stale)` once the cache passes its freshness window). Cached entries are pruned by age and count so local storage does not grow without bound.
+---
 
-This improves reliability during:
+## Linux integration
 
-- Temporary API failures
-- Offline moments
-- Slow network responses
-- Rate-limited or interrupted refreshes
+On Vicinae the extension is scriptable and connected to the desktop:
+
+```bash
+# Launch a command from a terminal, a script, or a Hyprland keybind
+vicinae cmd launch @nedim_perva/forecast-pilot:today-weather-brief
+
+# Open Search Weather pre-filled
+vicinae cmd launch @nedim_perva/forecast-pilot:search-weather Sarajevo
+
+# Same thing as a deeplink
+vicinae deeplink 'vicinae://launch/@nedim_perva/forecast-pilot/search-weather?fallbackText=Sarajevo'
+
+# Read the current conditions from any script or bar widget
+cat "${XDG_STATE_HOME:-$HOME/.local/state}/forecast-pilot/current.json"
+```
+
+**[Read the full Linux guide →](docs/linux.md)** — status file schema, Waybar
+and quickshell examples, Hyprland keybinds, notification setup, and Linux-only
+troubleshooting.
+
+---
+
+## Data sources
+
+| Data | Source |
+| --- | --- |
+| Forecast, rain probability, clear-sky UV | met.no Locationforecast `complete` |
+| Weather alerts | met.no MetAlerts |
+| Sunrise and sunset | met.no Sunrise |
+| Place search | Open-Meteo Geocoding |
+| Air quality | Open-Meteo Air Quality |
+
+UV is derived from the forecast's clear-sky UV index, attenuated by forecast
+cloud cover, so no separate UV request is needed.
+
+### Data freshness and caching
+
+Views show freshness timestamps where available. The shared fetch hook keeps the
+last successful response in local storage; if a refresh fails, cached data is
+shown and labelled as cached, then `(stale)` once it passes its freshness
+window. Cached entries are pruned by age and count so storage does not grow
+without bound.
+
+This keeps the extension useful during temporary API failures, offline moments,
+slow networks, and interrupted refreshes.
+
+### met.no User-Agent
+
+met.no requires a `User-Agent` identifying the application and a contact point.
+Update it before distributing a fork:
+
+```ts
+// src/constants.ts
+export const APP_USER_AGENT =
+  "forecast-pilot-raycast-extension/1.2 (https://github.com/nedimperva/ray-weather)";
+```
+
+---
 
 ## Privacy
 
-The extension stores the following locally in Raycast LocalStorage:
+Stored locally, in the launcher's local storage:
 
-- Favorite locations
-- Favorite nicknames and groups
+- Favorite locations, nicknames, and groups
 - Search history
-- Pinned menu bar location
+- The pinned location
 - Cached API responses
+- Which alerts have already been notified about
 
-The extension sends:
+Written to disk on Linux: the status file, containing current conditions and
+active alerts for the default location.
 
-- Place search text to Open-Meteo Geocoding
-- Coordinates to met.no and Open-Meteo weather APIs
+Sent over the network: your search text to Open-Meteo Geocoding, and coordinates
+to met.no and Open-Meteo. No API keys, no accounts, no analytics.
 
-No API keys are used.
-
-## Architecture
-
-```text
-src/
-  components/
-    Shared Raycast views and action groups
-  hooks/
-    Data fetching, local storage, favorites, default location
-  utils/
-    Forecast parsing, formatting, colors, icons, decisions, alerts
-  search-weather.tsx
-  today-weather-brief.tsx
-  compare-weather.tsx
-  weekend-planner.tsx
-  commute-forecast.tsx
-  comfort-ranking.tsx
-  severe-weather-alerts.tsx
-  travel-packing-forecast.tsx
-  share-forecast.tsx
-  manage-favorites.tsx
-  menu-bar-weather.tsx
-```
-
-Important utilities:
-
-- `buildDailyForecast`: converts met.no timeseries data into daily summaries, including per-day max UV and rain probability.
-- `buildComfortScore`: calculates a 0-100 outdoor comfort score.
-- `buildDecisionTags`: creates forecast tags such as `Rain likely`, `Windy`, `High UV`, and `Great outside`.
-- `buildShouldIDecisions`: powers umbrella, jacket, walk, and drive answers.
-- `buildPackingSuggestions`: powers the travel packing command.
-- `useWeatherData`: single hook bundling forecast, alerts, and air quality, with alerts mapped to the days they cover and air quality sampled per day.
-- `useLocationSwitcher`: provides the search-bar location dropdown for single-location commands.
-- `useCachedFetch`: wraps API calls with user-agent headers, previous data, local cache fallback, staleness, and pruning.
-- `useDefaultLocation`: resolves pinned location, then first favorite.
-
-## Development
-
-Install dependencies:
-
-```powershell
-npm install
-```
-
-Start Raycast extension development:
-
-```powershell
-npm run dev
-```
-
-Build:
-
-```powershell
-npm run build
-```
-
-Lint:
-
-```powershell
-npm run lint
-```
-
-Fix formatting and lint issues:
-
-```powershell
-npm run fix-lint
-```
-
-Run the unit tests (Vitest) for the pure forecast, comfort, alert, and UV logic:
-
-```powershell
-npm test
-```
-
-Raycast lint validates the package schema and author online. If your environment blocks network access, package validation may fail even when TypeScript and ESLint pass.
-
-## Store Screenshots
-
-Store screenshots live in `metadata/` as `forecast-pilot-{n}.png`, sized 2000x1250 (the Raycast store spec).
-
-The current images are generated mockups of the List UI built from representative content (multiple favorite locations and active alerts) so the layout is reproducible:
-
-```bash
-pip install Pillow
-python3 scripts/render_screenshots.py
-```
-
-For a final store submission you can replace them with real captures from Raycast's built-in Window Capture (it exports at the same 2000x1250 size).
-
-## met.no User-Agent
-
-met.no requires a custom `User-Agent` with app identity and contact information.
-
-Update this constant before publishing or distributing widely:
-
-```ts
-export const APP_USER_AGENT =
-  "forecast-pilot-raycast-extension/1.1 (https://github.com/nedimperva/ray-weather)";
-```
-
-The constant is defined in:
-
-```text
-src/constants.ts
-```
+---
 
 ## Troubleshooting
 
-### No default location
+**No default location.** Pin one from Search Weather, or add a favorite.
 
-Pin a location from `Search Weather`, or add at least one favorite.
+**Compare Weather has no locations.** It needs at least two favorites.
 
-### Compare Weather has no locations
+**Data looks old.** Use the refresh action. If the API is failing, cached
+fallback data is shown and labelled as cached.
 
-Add at least two favorite locations.
+**Air quality or UV is missing.** Open-Meteo does not return complete air
+quality data for every location, and UV only appears during daylight. Forecast
+data works independently.
 
-### Menu bar has no weather
+**No menu bar weather.** Pin a location or add a favorite. On Linux there is no
+menu bar — use Weather Watch instead.
 
-Pin a location or add a favorite. The menu bar command uses the pinned location first, then the first favorite.
+For Linux-specific problems (no notifications, missing status file, a command
+that does not appear), see
+[docs/linux.md](docs/linux.md#troubleshooting).
 
-### Data looks old
+---
 
-Open the relevant command and use the refresh action. If the API fails, cached fallback data may still be displayed and labeled as cached.
+## Development
 
-### Air quality or UV is missing
+See **[docs/development.md](docs/development.md)** for the project layout, the
+two-manifest build strategy, testing, and the rules for adding a command that
+works on both hosts.
 
-Some locations or time windows may not return complete air quality data from Open-Meteo, and UV is only reported during daylight. Forecast data can still work independently.
-
-## Running on Linux (Vicinae)
-
-Forecast Pilot also runs on [Vicinae](https://vicinae.com), a Raycast-compatible
-launcher for Linux. Vicinae serves its own implementation of `@raycast/api` at
-runtime, so the extension needs no source changes — only a different build step:
+Quick reference:
 
 ```bash
 npm install
-npm run build:vicinae
+npm test              # Vitest, pure forecast/comfort/alert/watch logic
+npm run lint          # Raycast lint: manifest, icons, metadata, ESLint, Prettier
+npm run dev           # Raycast development mode
+npm run build         # Raycast build
+npm run build:vicinae # Vicinae build and install
 ```
 
-`vici build` compiles straight into `~/.local/share/vicinae/extensions/forecast-pilot`,
-so building is installing. Restart the server to pick up a new extension:
-
-```bash
-systemctl --user restart vicinae.service
-```
-
-Two platform notes:
-
-- **Menu Bar Weather** does not appear on Vicinae. `menu-bar` is a macOS concept
-  and Vicinae has no menu bar to render into. Every other command works.
-- **Reveal actions** use `showInFinder` on Raycast and `showInFileBrowser` on
-  Vicinae, resolved at runtime in `src/utils/revealFile.ts`.
+---
 
 ## License
 

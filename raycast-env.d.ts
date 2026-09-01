@@ -16,8 +16,12 @@ type ExtensionPreferences = {
   "precipitationUnit": "mm" | "inches",
   /** Forecast Days - Number of forecast days to display */
   "forecastDays": "3" | "5" | "7" | "10",
-  /** Menu Bar Display - Choose what appears in the menu bar title */
+  /** Status Display - What the menu bar title (macOS/Windows) and the status file text (Linux) show */
   "menuBarDisplayMode": "temp-only" | "temp-condition" | "temp-rain" | "feels-like" | "location-temp" | "compact",
+  /** Alert Notifications - Which severe weather alerts Weather Watch notifies about (desktop notifications on Linux/Vicinae) */
+  "alertNotifications": "severe" | "all" | "off",
+  /** Rain Notifications - Warn once when rain is expected to begin within 90 minutes */
+  "rainNotifications": boolean,
   /** Morning Commute Start - Start hour for morning commute forecast */
   "morningCommuteStart": "5" | "6" | "7" | "8" | "9" | "10",
   /** Morning Commute End - End hour for morning commute forecast */
@@ -52,13 +56,18 @@ declare namespace Preferences {
   export type ShareForecast = ExtensionPreferences & {}
   /** Preferences accessible in the `severe-weather-alerts` command */
   export type SevereWeatherAlerts = ExtensionPreferences & {}
+  /** Preferences accessible in the `weather-watch` command */
+  export type WeatherWatch = ExtensionPreferences & {}
   /** Preferences accessible in the `menu-bar-weather` command */
   export type MenuBarWeather = ExtensionPreferences & {}
 }
 
 declare namespace Arguments {
   /** Arguments passed to the `search-weather` command */
-  export type SearchWeather = {}
+  export type SearchWeather = {
+  /** City or place */
+  "location": string
+}
   /** Arguments passed to the `today-weather-brief` command */
   export type TodayWeatherBrief = {}
   /** Arguments passed to the `manage-favorites` command */
@@ -77,6 +86,8 @@ declare namespace Arguments {
   export type ShareForecast = {}
   /** Arguments passed to the `severe-weather-alerts` command */
   export type SevereWeatherAlerts = {}
+  /** Arguments passed to the `weather-watch` command */
+  export type WeatherWatch = {}
   /** Arguments passed to the `menu-bar-weather` command */
   export type MenuBarWeather = {}
 }

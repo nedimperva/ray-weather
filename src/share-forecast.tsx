@@ -15,6 +15,7 @@ import type { SearchBarDropdown } from "./hooks";
 import { getPrefs } from "./preferences";
 import { AlertBadge, CommonActions } from "./components";
 import { CopyWeekendPlanImageAction } from "./components/CopyWeekendPlanImageAction";
+import { SetWeekendWallpaperAction } from "./components/SetWeekendWallpaperAction";
 import { iconForSymbol } from "./utils/icons";
 import { colorForTemperature } from "./utils/colors";
 import {
@@ -152,6 +153,7 @@ function ShareForecastView(props: {
             actions={
               <ActionPanel>
                 <CopyWeekendPlanImageAction input={weekendImageInput} />
+                <SetWeekendWallpaperAction input={weekendImageInput} />
                 <Action.CopyToClipboard
                   title="Copy Compact Forecast"
                   content={compact}
@@ -172,7 +174,10 @@ function ShareForecastView(props: {
           actions={
             <ActionPanel>
               {bestDay ? (
-                <CopyWeekendPlanImageAction input={weekendImageInput} />
+                <>
+                  <CopyWeekendPlanImageAction input={weekendImageInput} />
+                  <SetWeekendWallpaperAction input={weekendImageInput} />
+                </>
               ) : null}
               <Action.CopyToClipboard
                 title="Copy Markdown Forecast"
@@ -198,7 +203,10 @@ function ShareForecastView(props: {
           actions={
             <ActionPanel>
               {bestDay ? (
-                <CopyWeekendPlanImageAction input={weekendImageInput} />
+                <>
+                  <CopyWeekendPlanImageAction input={weekendImageInput} />
+                  <SetWeekendWallpaperAction input={weekendImageInput} />
+                </>
               ) : null}
               <Action.CopyToClipboard
                 title="Copy Compact Forecast"

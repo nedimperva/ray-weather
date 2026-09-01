@@ -3,6 +3,7 @@ import { getPreferenceValues } from "@raycast/api";
 export type TemperatureUnit = "celsius" | "fahrenheit";
 export type WindSpeedUnit = "ms" | "kmh" | "mph" | "knots";
 export type PrecipitationUnit = "mm" | "inches";
+export type AlertNotificationMode = "off" | "severe" | "all";
 export type MenuBarDisplayMode =
   | "temp-only"
   | "temp-condition"
@@ -21,6 +22,8 @@ export interface Preferences {
   morningCommuteEnd: string;
   eveningCommuteStart: string;
   eveningCommuteEnd: string;
+  alertNotifications: AlertNotificationMode;
+  rainNotifications: boolean;
 }
 
 export function getPrefs(): Preferences {

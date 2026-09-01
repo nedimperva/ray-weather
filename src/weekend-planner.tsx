@@ -16,6 +16,7 @@ import type { SearchBarDropdown } from "./hooks";
 import { getPrefs } from "./preferences";
 import { AlertBadge, CommonActions } from "./components";
 import { CopyWeekendPlanImageAction } from "./components/CopyWeekendPlanImageAction";
+import { SetWeekendWallpaperAction } from "./components/SetWeekendWallpaperAction";
 import { iconForSymbol } from "./utils/icons";
 import {
   colorForPrecipitation,
@@ -199,6 +200,7 @@ function WeekendPlannerView(props: {
                     content={copyPlan}
                   />
                   <CopyWeekendPlanImageAction input={weekendImageInput} />
+                  <SetWeekendWallpaperAction input={weekendImageInput} />
                   <Action
                     title="Refresh Weekend Planner"
                     icon={Icon.ArrowClockwise}

@@ -24,6 +24,7 @@ import {
   formatIsoTimeInTimezone,
 } from "./utils/dates";
 import { parseWeatherAlerts, severityRank } from "./utils/alerts";
+import { buildStatusText } from "./utils/statusText";
 import { adjustUvForClouds } from "./utils/uv";
 
 const severityColors: Record<string, Color> = {
@@ -125,33 +126,17 @@ function MenuBarContent(props: { location: Location }) {
 
   const hasAlerts = alerts.length > 0;
   const title = current
-    ? (() => {
-        const temperature = formatTemperature(
-          current.tempC,
-          prefs.temperatureUnit,
-        );
-        switch (prefs.menuBarDisplayMode) {
-          case "temp-only":
-            return temperature;
-          case "temp-rain":
-            return `${temperature} ${formatPrecipitation(
-              current.precipMm,
-              prefs.precipitationUnit,
-            )}`;
-          case "feels-like":
-            return `Feels ${formatTemperature(
-              current.feelsLikeC,
-              prefs.temperatureUnit,
-            )}`;
-          case "location-temp":
-            return `${displayLocationName(location)} ${temperature}`;
-          case "compact":
-            return undefined;
-          case "temp-condition":
-          default:
-            return `${temperature} ${current.condition}`;
-        }
-      })()
+    ? buildStatusText(
+        {
+          locationName: displayLocationName(location),
+          tempC: current.tempC,
+          feelsLikeC: current.feelsLikeC,
+          condition: current.condition,
+          precipMm: current.precipMm,
+        },
+        prefs.menuBarDisplayMode,
+        prefs,
+      )
     : prefs.menuBarDisplayMode === "compact"
       ? undefined
       : "Loading...";
